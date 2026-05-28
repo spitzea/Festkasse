@@ -1,0 +1,93 @@
+{
+  "users": [
+    {
+      "id": "usr_001",
+      "username": "kasse",
+      "password": "kasse123",
+      "role": "user",
+      "active": true
+    },
+    {
+      "id": "usr_002",
+      "username": "admin",
+      "password": "admin123",
+      "role": "admin",
+      "active": true
+    }
+  ],
+  "articles": [
+    {
+      "id": "art_001",
+      "name": "Bratwurst mit Brötchen/Brot",
+      "price": 3.5,
+      "stock": 80,
+      "warningStock": 5,
+      "category": "Grill",
+      "categoryColor": "#e32626",
+      "sortOrder": 1,
+      "active": true
+    }
+  ],
+  "orders": [
+    {
+      "id": "ord_001",
+      "createdAt": "2026-05-28T12:00:00.000Z",
+      "cashierId": "usr_001",
+      "status": "paid",
+      "paidAmount": 10,
+      "changeAmount": 3,
+      "total": 7,
+      "items": [
+        {
+          "id": "itm_001",
+          "articleId": "art_001",
+          "name": "Bratwurst mit Brötchen/Brot",
+          "quantity": 2,
+          "unitPrice": 3.5,
+          "lineTotal": 7,
+          "isFree": false
+        }
+      ]
+    }
+  ],
+  "cancellations": [
+    {
+      "id": "can_001",
+      "createdAt": "2026-05-28T12:05:00.000Z",
+      "cashierId": "usr_001",
+      "reason": "Warenkorb geleert",
+      "items": []
+    }
+  ],
+  "dayReports": [
+    {
+      "id": "day_001",
+      "createdAt": "2026-05-28T20:00:00.000Z",
+      "eventName": "Feuerwehrfest",
+      "clubName": "Freiwillige Feuerwehr Zellhausen",
+      "logoDataUrl": "",
+      "total": 7,
+      "orderCount": 1,
+      "orders": []
+    }
+  ],
+  "settings": {
+    "clubName": "Freiwillige Feuerwehr Zellhausen",
+    "eventName": "Feuerwehrfest",
+    "currency": "EUR",
+    "defaultWarningStock": 5,
+    "printerName": "Browserdruck",
+    "receiptFooter": "Danke und Gut Schlauch!",
+    "logoDataUrl": "",
+    "calculatorName": "name",
+    "calculatorPhone": "123123/123123",
+    "calculatorComment": "",
+    "menuVersion": 4,
+    "categories": [
+      {
+        "name": "Grill",
+        "color": "#e32626"
+      }
+    ]
+  }
+}
