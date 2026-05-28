@@ -1,10 +1,9 @@
-const STORE_KEY = "ffz_festkasse_mvp";
 const DEFAULT_RESET_STOCK = 500;
 
 const seedData = {
   users: [
-    { id: "usr_kasse", username: "kasse", password: "kasse123", role: "user", active: true },
-    { id: "usr_admin", username: "admin", password: "admin123", role: "admin", active: true }
+    { id: "usr_kasse", username: "kasse", role: "user", active: true },
+    { id: "usr_admin", username: "admin", role: "admin", active: true }
   ],
   articles: [
     { id: "art_001", name: "Paprikaschnitzel mit Pommes", price: 12, stock: 500, warningStock: 5, category: "Schnitzel", categoryColor: "#e32626", active: true },
@@ -35,7 +34,8 @@ const seedData = {
     calculatorName: "name",
     calculatorPhone: "123123/123123",
     calculatorComment: "",
-    menuVersion: 4,
+    menuVersion: 5,
+    activeEventFile: "fest.json",
     categories: [
       { name: "Schnitzel", color: "#e32626" },
       { name: "Küche", color: "#f97316" },
@@ -48,7 +48,7 @@ const seedData = {
   }
 };
 
-let state = loadState();
+let state = cloneData(seedData);
 let sessionUser = null;
 let activeView = "cashier";
 let activeAdminSection = "analysis";
@@ -57,16 +57,14 @@ let paidAmount = "";
 let toastTimer = null;
 let clockTimer = null;
 const adminDirtySections = new Set();
+let eventCatalog = null;
+let bootError = "";
 
-function loadState() {
-  const existing = localStorage.getItem(STORE_KEY);
-  if (!existing) {
-    localStorage.setItem(STORE_KEY, JSON.stringify(seedData));
-    return cloneData(seedData);
-  }
-
-  const parsed = JSON.parse(existing);
-  return normalizeState(parsed);
+async function loadState() {
+  const response = await fetch("/api/state");
+  if (!response.ok) throw new Error("Serverdaten konnten nicht geladen werden.");
+  const payload = await response.json();
+  return normalizeState(payload.state);
 }
 
 function cloneData(data) {
@@ -95,7 +93,8 @@ function normalizeState(data) {
   if (menuVersion < 4) {
     applyArticleNameCleanup(normalized.articles);
   }
-  normalized.settings.menuVersion = 4;
+  normalized.settings.menuVersion = 5;
+  normalized.settings.activeEventFile ||= "fest.json";
   normalized.articles = normalized.articles.map((article, index) => ({
     ...article,
     sortOrder: Number.isFinite(Number(article.sortOrder)) ? Number(article.sortOrder) : index + 1
@@ -132,8 +131,19 @@ function normalizeCategories(categories, articles) {
   return [...categoryMap.values()].sort((a, b) => a.name.localeCompare(b.name, "de"));
 }
 
-function saveState() {
-  localStorage.setItem(STORE_KEY, JSON.stringify(state));
+async function saveState() {
+  const response = await fetch("/api/state", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ state })
+  });
+  if (!response.ok) {
+    showToast("Speichern auf dem Server fehlgeschlagen.");
+    return false;
+  }
+  const payload = await response.json();
+  state = normalizeState(payload.state);
+  return true;
 }
 
 function colorForCategory(category) {
@@ -221,6 +231,18 @@ function canManage() {
 
 function render() {
   const app = document.querySelector("#app");
+  if (bootError) {
+    app.innerHTML = `
+      <main class="login-screen">
+        <section class="panel login-card">
+          <h1>Festkasse</h1>
+          <p class="error">${bootError}</p>
+        </section>
+      </main>
+    `;
+    return;
+  }
+
   if (!sessionUser) {
     app.innerHTML = loginTemplate();
     bindLogin();
@@ -709,8 +731,89 @@ function settingsTemplate() {
           ${state.settings.logoDataUrl ? `<img src="${state.settings.logoDataUrl}" alt="Logo Vorschau" />` : "<span>Kein Logo hinterlegt</span>"}
         </div>
       </form>
+      ${userAccessTemplate()}
+      ${dataManagementTemplate()}
     </section>
   `;
+}
+
+function userAccessTemplate() {
+  return `
+    <section class="data-panel">
+      <div class="section-header">
+        <div>
+          <h3>Benutzer & Passwörter</h3>
+          <p>Passwörter werden nur als Hash in der Festdatei gespeichert.</p>
+        </div>
+      </div>
+      <div class="user-list">
+        ${state.users.map((user) => `
+          <form class="user-password-card" data-password-user="${user.username}">
+            <div>
+              <strong>${user.username}</strong>
+              <span>${roleLabel(user.role)}</span>
+            </div>
+            <div class="field">
+              <label>Neues Passwort</label>
+              <input name="password" type="password" autocomplete="new-password" minlength="4" />
+            </div>
+            <button class="primary-button small-button" type="submit">Passwort setzen</button>
+          </form>
+        `).join("")}
+      </div>
+    </section>
+  `;
+}
+
+function dataManagementTemplate() {
+  return `
+    <section class="data-panel">
+      <div class="section-header">
+        <div>
+          <h3>Daten & Vorlagen</h3>
+          <p>Aktuelles Fest sichern, Vorlagen laden oder fremde Festdaten löschen.</p>
+        </div>
+        <button class="ghost-button small-button" data-refresh-events>Aktualisieren</button>
+      </div>
+      <div class="data-actions">
+        <button class="primary-button" data-save-current-event>Aktuelles Fest sichern</button>
+        <button class="ghost-button" data-new-default-event>Neues Fest aus Default starten</button>
+        <button class="danger-button" data-load-default-event>Default-Daten laden</button>
+      </div>
+      <div class="field data-new-field">
+        <label>Neues Fest als Name</label>
+        <input data-new-event-name value="${state.settings.eventName}" />
+      </div>
+      <div class="event-list" data-event-list>
+        ${eventCatalogTemplate()}
+      </div>
+    </section>
+  `;
+}
+
+function eventCatalogTemplate() {
+  if (!eventCatalog) {
+    return `<p class="hint">Vorlagen werden geladen...</p>`;
+  }
+
+  const rows = [...(eventCatalog.events || []), ...(eventCatalog.archive || [])];
+  if (!rows.length) {
+    return `<p class="hint">Noch keine gespeicherten Feste vorhanden.</p>`;
+  }
+
+  return rows.map((event) => `
+    <article class="event-card">
+      <div>
+        <strong>${event.eventName}</strong>
+        <span>${event.clubName || "-"} · ${event.file} · ${event.type === "archive" ? "Archiv" : "Fest"}</span>
+      </div>
+      <div class="event-actions">
+        <button class="small-button" data-load-event="${event.file}">Fest laden</button>
+        <button class="small-button" data-template-event="${event.file}">Als Vorlage</button>
+        <button class="danger-button small-button" data-delete-event="${event.file}">Löschen</button>
+      </div>
+    </article>
+  `).join("");
 }
 
 function articleFormTemplate() {
@@ -781,22 +884,27 @@ function articleEditTemplate(article, index) {
 }
 
 function bindLogin() {
-  document.querySelector("[data-login-form]").addEventListener("submit", (event) => {
+  document.querySelector("[data-login-form]").addEventListener("submit", async (event) => {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
-    const user = state.users.find((candidate) =>
-      candidate.username === form.get("username") &&
-      candidate.password === form.get("password") &&
-      candidate.active
-    );
+    const response = await fetch("/api/login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        username: form.get("username"),
+        password: form.get("password")
+      })
+    });
 
-    if (!user) {
+    if (!response.ok) {
       document.querySelector("[data-login-error]").classList.remove("hidden");
       return;
     }
 
-    sessionUser = user;
+    const payload = await response.json();
+    sessionUser = payload.user;
     activeView = "cashier";
+    state = await loadState();
     render();
   });
 }
@@ -899,6 +1007,25 @@ function bindAdmin() {
     event.preventDefault();
     saveSettings();
   });
+  document.querySelector("[data-refresh-events]")?.addEventListener("click", refreshEventCatalog);
+  document.querySelector("[data-save-current-event]")?.addEventListener("click", saveCurrentEvent);
+  document.querySelector("[data-new-default-event]")?.addEventListener("click", startDefaultEvent);
+  document.querySelector("[data-load-default-event]")?.addEventListener("click", loadDefaultEvent);
+  document.querySelectorAll("[data-password-user]").forEach((formElement) => {
+    formElement.addEventListener("submit", setUserPassword);
+  });
+  document.querySelectorAll("[data-load-event]").forEach((button) => {
+    button.addEventListener("click", () => loadManagedEvent(button.dataset.loadEvent, "full"));
+  });
+  document.querySelectorAll("[data-template-event]").forEach((button) => {
+    button.addEventListener("click", () => loadManagedEvent(button.dataset.templateEvent, "template"));
+  });
+  document.querySelectorAll("[data-delete-event]").forEach((button) => {
+    button.addEventListener("click", () => deleteManagedEvent(button.dataset.deleteEvent));
+  });
+  if (activeAdminSection === "settings") {
+    refreshEventCatalog();
+  }
 
   document.querySelector("[data-save-categories]")?.addEventListener("click", saveCategories);
   document.querySelector("[data-save-articles]")?.addEventListener("click", saveArticles);
@@ -997,6 +1124,135 @@ function markAdminDirty(section) {
 
 function clearAdminDirty(section) {
   adminDirtySections.delete(section);
+}
+
+async function refreshEventCatalog() {
+  const response = await fetch("/api/events");
+  if (!response.ok) {
+    showToast("Festliste konnte nicht geladen werden.");
+    return;
+  }
+  eventCatalog = await response.json();
+  const list = document.querySelector("[data-event-list]");
+  if (list) {
+    list.innerHTML = eventCatalogTemplate();
+    bindEventCatalogActions();
+  }
+}
+
+function bindEventCatalogActions() {
+  document.querySelectorAll("[data-load-event]").forEach((button) => {
+    button.addEventListener("click", () => loadManagedEvent(button.dataset.loadEvent, "full"));
+  });
+  document.querySelectorAll("[data-template-event]").forEach((button) => {
+    button.addEventListener("click", () => loadManagedEvent(button.dataset.templateEvent, "template"));
+  });
+  document.querySelectorAll("[data-delete-event]").forEach((button) => {
+    button.addEventListener("click", () => deleteManagedEvent(button.dataset.deleteEvent));
+  });
+}
+
+async function saveCurrentEvent() {
+  const name = document.querySelector("[data-new-event-name]")?.value || state.settings.eventName;
+  const response = await fetch("/api/events/save", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ name })
+  });
+  if (!response.ok) {
+    showToast("Fest konnte nicht gesichert werden.");
+    return;
+  }
+  const payload = await response.json();
+  state = normalizeState(payload.state);
+  showToast(`Fest gesichert: ${payload.file}`);
+  await refreshEventCatalog();
+}
+
+async function startDefaultEvent() {
+  const eventName = document.querySelector("[data-new-event-name]")?.value || "Neues Fest";
+  if (!window.confirm(`Neues Fest "${eventName}" aus Default starten?\n\nAktuelle Verkäufe werden durch ein leeres Fest ersetzt.`)) return;
+  const response = await fetch("/api/events/new", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ eventName })
+  });
+  await applyEventResponse(response, "Neues Fest gestartet.");
+}
+
+async function loadDefaultEvent() {
+  if (!window.confirm("Default-Daten laden?\n\nDas aktuelle Fest wird durch die Grunddaten ersetzt.")) return;
+  const response = await fetch("/api/events/load", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ source: "defaults", mode: "template", eventName: state.settings.eventName })
+  });
+  await applyEventResponse(response, "Default-Daten geladen.");
+}
+
+async function loadManagedEvent(file, mode) {
+  const eventName = document.querySelector("[data-new-event-name]")?.value || state.settings.eventName;
+  const text = mode === "template"
+    ? `Fest "${file}" als Vorlage verwenden?\n\nVerkäufe und Tagesabschlüsse werden geleert, Artikel und Einstellungen übernommen.`
+    : `Fest "${file}" vollständig laden?\n\nDas aktuelle Fest wird ersetzt.`;
+  if (!window.confirm(text)) return;
+  const response = await fetch("/api/events/load", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ file, mode, eventName })
+  });
+  await applyEventResponse(response, mode === "template" ? "Vorlage geladen." : "Fest geladen.");
+}
+
+async function deleteManagedEvent(file) {
+  if (!window.confirm(`Festdatei "${file}" endgültig löschen?`)) return;
+  const response = await fetch("/api/events", {
+    method: "DELETE",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ file })
+  });
+  if (!response.ok) {
+    showToast("Festdatei konnte nicht gelöscht werden.");
+    return;
+  }
+  showToast("Festdatei gelöscht.");
+  await refreshEventCatalog();
+}
+
+async function applyEventResponse(response, message) {
+  if (!response.ok) {
+    showToast("Festdaten konnten nicht geladen werden.");
+    return;
+  }
+  const payload = await response.json();
+  state = normalizeState(payload.state);
+  cart = [];
+  paidAmount = "";
+  eventCatalog = null;
+  showToast(message);
+  render();
+}
+
+async function setUserPassword(event) {
+  event.preventDefault();
+  const form = new FormData(event.currentTarget);
+  const password = String(form.get("password") || "");
+  if (password.length < 4) {
+    showToast("Passwort bitte mit mindestens 4 Zeichen setzen.");
+    return;
+  }
+  const username = event.currentTarget.dataset.passwordUser;
+  const response = await fetch("/api/users/password", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ username, password })
+  });
+  if (!response.ok) {
+    showToast("Passwort konnte nicht gespeichert werden.");
+    return;
+  }
+  event.currentTarget.reset();
+  showToast(`Passwort für ${username} gespeichert.`);
 }
 
 function saveSettings() {
@@ -1400,4 +1656,13 @@ function showToast(message) {
   toastTimer = setTimeout(() => toast.classList.add("hidden"), 2200);
 }
 
-render();
+async function init() {
+  try {
+    state = await loadState();
+  } catch (error) {
+    bootError = "Die Festdaten konnten nicht vom Server geladen werden. Bitte die App über npm start / localhost öffnen.";
+  }
+  render();
+}
+
+init();

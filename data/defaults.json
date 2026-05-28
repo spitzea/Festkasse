@@ -1,0 +1,61 @@
+{
+  "users": [
+    {
+      "id": "usr_kasse",
+      "username": "kasse",
+      "role": "user",
+      "active": true,
+      "passwordSalt": "default-kasse",
+      "passwordHash": "80f7c7004e02d83a00b6b179409fc6736c0335277eddd0f6234b81dc14418d31"
+    },
+    {
+      "id": "usr_admin",
+      "username": "admin",
+      "role": "admin",
+      "active": true,
+      "passwordSalt": "default-admin",
+      "passwordHash": "48451a874317ae58ad068ea737fd3fbb1a9689958087047794809a74bbc5ff79"
+    }
+  ],
+  "articles": [
+    { "id": "art_001", "name": "Paprikaschnitzel mit Pommes", "price": 12, "stock": 500, "warningStock": 5, "category": "Schnitzel", "categoryColor": "#e32626", "active": true, "sortOrder": 1 },
+    { "id": "art_002", "name": "Rahmschnitzel mit Pommes", "price": 12, "stock": 500, "warningStock": 5, "category": "Schnitzel", "categoryColor": "#e32626", "active": true, "sortOrder": 2 },
+    { "id": "art_003", "name": "Kochkäseschnitzel mit Brot", "price": 12, "stock": 500, "warningStock": 5, "category": "Schnitzel", "categoryColor": "#e32626", "active": true, "sortOrder": 3 },
+    { "id": "art_004", "name": "Hackbraten mit Soße und Brot", "price": 8.5, "stock": 500, "warningStock": 5, "category": "Küche", "categoryColor": "#f97316", "active": true, "sortOrder": 4 },
+    { "id": "art_005", "name": "Bratwurst mit Brötchen/Brot", "price": 4, "stock": 500, "warningStock": 5, "category": "Grill", "categoryColor": "#ffb703", "active": true, "sortOrder": 5 },
+    { "id": "art_006", "name": "Rindswurst mit Brötchen/Brot", "price": 4, "stock": 500, "warningStock": 5, "category": "Grill", "categoryColor": "#ffb703", "active": true, "sortOrder": 6 },
+    { "id": "art_007", "name": "Pommes", "price": 3, "stock": 500, "warningStock": 10, "category": "Beilagen", "categoryColor": "#22c55e", "active": true, "sortOrder": 7 },
+    { "id": "art_008", "name": "Kochkäse mit Brot", "price": 4, "stock": 500, "warningStock": 5, "category": "Beilagen", "categoryColor": "#22c55e", "active": true, "sortOrder": 8 },
+    { "id": "art_009", "name": "Pinsa Salami", "price": 8.5, "stock": 500, "warningStock": 5, "category": "Pinsa", "categoryColor": "#8b5cf6", "active": true, "sortOrder": 9 },
+    { "id": "art_010", "name": "Pinsa vegetarisch", "price": 8.5, "stock": 500, "warningStock": 5, "category": "Pinsa", "categoryColor": "#8b5cf6", "active": true, "sortOrder": 10 },
+    { "id": "art_011", "name": "Feta Grillpfännchen", "price": 6, "stock": 500, "warningStock": 5, "category": "Vegetarisch", "categoryColor": "#14b8a6", "active": true, "sortOrder": 11 },
+    { "id": "art_012", "name": "Currywurst", "price": 4.5, "stock": 500, "warningStock": 5, "category": "Grill", "categoryColor": "#ffb703", "active": true, "sortOrder": 12 },
+    { "id": "art_013", "name": "Schwedensalat", "price": 2, "stock": 500, "warningStock": 5, "category": "Salat", "categoryColor": "#0ea5e9", "active": true, "sortOrder": 13 }
+  ],
+  "orders": [],
+  "cancellations": [],
+  "dayReports": [],
+  "settings": {
+    "clubName": "Freiwillige Feuerwehr Zellhausen",
+    "eventName": "Feuerwehrfest",
+    "currency": "EUR",
+    "defaultWarningStock": 5,
+    "printerName": "Browserdruck",
+    "receiptFooter": "Danke und Gut Schlauch!",
+    "logoDataUrl": "",
+    "calculatorName": "name",
+    "calculatorPhone": "123123/123123",
+    "calculatorComment": "",
+    "menuVersion": 5,
+    "activeEventFile": "fest.json",
+    "categories": [
+      { "name": "Schnitzel", "color": "#e32626" },
+      { "name": "Küche", "color": "#f97316" },
+      { "name": "Grill", "color": "#ffb703" },
+      { "name": "Beilagen", "color": "#22c55e" },
+      { "name": "Pinsa", "color": "#8b5cf6" },
+      { "name": "Vegetarisch", "color": "#14b8a6" },
+      { "name": "Salat", "color": "#0ea5e9" }
+    ]
+  }
+}

@@ -1,7 +1,7 @@
 {
   "name": "festkasse-zellhausen",
   "version": "0.1.0",
-  "description": "Webbasierte MVP-Festkasse fuer die Freiwillige Feuerwehr Zellhausen",
+  "description": "Webbasierte MVP-Festkasse für die Freiwillige Feuerwehr Zellhausen",
   "private": true,
   "scripts": {
     "start": "node server.js"

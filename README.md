@@ -1,6 +1,6 @@
 # Festkasse Zellhausen
 
-Webbasierte MVP-Festkasse für Feuerwehrfeste, lokal im Browser oder über einen kleinen Node/Express-Server nutzbar.
+Webbasierte MVP-Festkasse für Feuerwehrfeste, lokal im Browser oder über einen kleinen Node-Server nutzbar.
 
 ## Start
 
@@ -15,7 +15,7 @@ Danach im Browser öffnen:
 http://localhost:3000
 ```
 
-Alternativ kann `public/index.html` direkt im Browser geöffnet werden. Die Daten liegen dann im `localStorage` des Browsers.
+Wichtig: Die Kasse sollte über den Node-Server laufen. Nur dann werden Daten zentral in JSON-Dateien gespeichert und können von mehreren Browsern oder Geräten genutzt werden.
 
 ## Demo-Logins
 
@@ -24,10 +24,39 @@ Alternativ kann `public/index.html` direkt im Browser geöffnet werden. Die Date
 | User | `kasse` | `kasse123` |
 | Admin | `admin` | `admin123` |
 
+Passwörter werden in den Festdaten nicht im Klartext gespeichert, sondern als Salt + Hash.
+
+## Datenhaltung
+
+Die laufenden Festdaten liegen zentral auf dem Server:
+
+```text
+data/defaults.json       Grunddaten und neutrale Vorlage
+data/fest.json           aktuell geladenes/laufendes Fest
+data/events/*.json       gespeicherte Feste und Vorlagen
+data/archive/*.json      Archiv für abgeschlossene Feste
+```
+
+`public/app.js` enthält nur noch die Browserlogik und einen Fallback-Datensatz für die Oberfläche. Die aktive Datenquelle ist `data/fest.json`.
+
+## Admin: Daten & Vorlagen
+
+Unter `Einstellungen` gibt es den Bereich `Daten & Vorlagen`:
+
+- aktuelles Fest sichern
+- neues Fest aus Default starten
+- Default-Daten laden
+- gespeicherte Feste vollständig laden
+- gespeicherte Feste als Vorlage laden
+- fremde/alte Festdateien löschen
+
+Beim Laden als Vorlage werden Artikel, Kategorien, Benutzer und Einstellungen übernommen. Verkäufe, Stornos und Tagesabschlüsse werden geleert und Artikelbestände auf 500 gesetzt.
+
 ## MVP-Funktionen
 
 - Login mit Rollen
 - Rollen: User und Admin
+- zentrale JSON-Datenhaltung über den Node-Server
 - Kassenansicht mit großen Artikelbuttons
 - dauerhaft sichtbarer Warenkorb
 - Positionen erhöhen, reduzieren und löschen
@@ -39,17 +68,6 @@ Alternativ kann `public/index.html` direkt im Browser geöffnet werden. Die Date
 - Warnung bei knappem Bestand
 - Admin-Auswertung mit getrennten Tabellen für normale Buchungen, kostenlose Buchungen und Gesamtverbrauch
 - Artikel anlegen, bearbeiten, deaktivieren, kategorisieren, einfärben und Bestand korrigieren
-- Festname, Vereinsname und Logo im Adminbereich ändern
-
-## Datenmodell
-
-Die App speichert JSON-Strukturen für:
-
-- `users`
-- `articles`
-- `orders`
-- `order_items` als `items` innerhalb einer Bestellung
-- `cancellations`
-- `settings`
-
-Für den nächsten Ausbauschritt können diese Strukturen nahezu direkt in JSON-Dateien oder SQLite-Tabellen überführt werden.
+- Kategorien verwalten
+- Festname, Vereinsname, Logo, Rechner, Telefonnummer und Hinweis im Adminbereich ändern
+- Passwörter im Adminbereich neu setzen

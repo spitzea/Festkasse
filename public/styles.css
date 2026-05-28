@@ -599,6 +599,85 @@ textarea:focus-visible {
   grid-template-columns: minmax(14rem, 32rem);
 }
 
+.section-header,
+.event-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-md);
+}
+
+.section-header h3,
+.section-header p {
+  margin: 0;
+}
+
+.section-header p {
+  margin-top: 0.2rem;
+  color: var(--muted);
+}
+
+.data-panel {
+  display: grid;
+  gap: var(--space-md);
+  padding: 1rem;
+  border-top: 1px solid var(--line);
+  background: rgba(24, 24, 27, 0.4);
+}
+
+.data-actions,
+.event-actions {
+  display: flex;
+  gap: var(--space-sm);
+  flex-wrap: wrap;
+}
+
+.data-new-field {
+  max-width: 32rem;
+}
+
+.event-list {
+  display: grid;
+  gap: var(--space-sm);
+}
+
+.user-list {
+  display: grid;
+  gap: var(--space-sm);
+}
+
+.event-card {
+  padding: 0.75rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--panel-strong);
+}
+
+.user-password-card {
+  display: grid;
+  grid-template-columns: minmax(8rem, 1fr) minmax(12rem, 18rem) auto;
+  align-items: end;
+  gap: var(--space-sm);
+  padding: 0.75rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--panel-strong);
+}
+
+.event-card strong,
+.event-card span,
+.user-password-card strong,
+.user-password-card span {
+  display: block;
+}
+
+.event-card span,
+.user-password-card span {
+  margin-top: 0.2rem;
+  color: var(--muted);
+  font-size: 0.88rem;
+}
+
 .logo-preview {
   display: grid;
   place-items: center;
@@ -923,8 +1002,12 @@ textarea:focus-visible {
   .article-form,
   .category-create,
   .category-edit-card,
+  .event-card,
+  .user-password-card,
   .article-edit-card {
     grid-template-columns: 1fr;
+    flex-direction: column;
+    align-items: stretch;
   }
 }
 
