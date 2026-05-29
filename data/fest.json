@@ -18,23 +18,280 @@
     }
   ],
   "articles": [
-    { "id": "art_001", "name": "Paprikaschnitzel mit Pommes", "price": 12, "stock": 500, "warningStock": 5, "category": "Schnitzel", "categoryColor": "#e32626", "active": true, "sortOrder": 1 },
-    { "id": "art_002", "name": "Rahmschnitzel mit Pommes", "price": 12, "stock": 500, "warningStock": 5, "category": "Schnitzel", "categoryColor": "#e32626", "active": true, "sortOrder": 2 },
-    { "id": "art_003", "name": "Kochkäseschnitzel mit Brot", "price": 12, "stock": 500, "warningStock": 5, "category": "Schnitzel", "categoryColor": "#e32626", "active": true, "sortOrder": 3 },
-    { "id": "art_004", "name": "Hackbraten mit Soße und Brot", "price": 8.5, "stock": 500, "warningStock": 5, "category": "Küche", "categoryColor": "#f97316", "active": true, "sortOrder": 4 },
-    { "id": "art_005", "name": "Bratwurst mit Brötchen/Brot", "price": 4, "stock": 500, "warningStock": 5, "category": "Grill", "categoryColor": "#ffb703", "active": true, "sortOrder": 5 },
-    { "id": "art_006", "name": "Rindswurst mit Brötchen/Brot", "price": 4, "stock": 500, "warningStock": 5, "category": "Grill", "categoryColor": "#ffb703", "active": true, "sortOrder": 6 },
-    { "id": "art_007", "name": "Pommes", "price": 3, "stock": 500, "warningStock": 10, "category": "Beilagen", "categoryColor": "#22c55e", "active": true, "sortOrder": 7 },
-    { "id": "art_008", "name": "Kochkäse mit Brot", "price": 4, "stock": 500, "warningStock": 5, "category": "Beilagen", "categoryColor": "#22c55e", "active": true, "sortOrder": 8 },
-    { "id": "art_009", "name": "Pinsa Salami", "price": 8.5, "stock": 500, "warningStock": 5, "category": "Pinsa", "categoryColor": "#8b5cf6", "active": true, "sortOrder": 9 },
-    { "id": "art_010", "name": "Pinsa vegetarisch", "price": 8.5, "stock": 500, "warningStock": 5, "category": "Pinsa", "categoryColor": "#8b5cf6", "active": true, "sortOrder": 10 },
-    { "id": "art_011", "name": "Feta Grillpfännchen", "price": 6, "stock": 500, "warningStock": 5, "category": "Vegetarisch", "categoryColor": "#14b8a6", "active": true, "sortOrder": 11 },
-    { "id": "art_012", "name": "Currywurst", "price": 4.5, "stock": 500, "warningStock": 5, "category": "Grill", "categoryColor": "#ffb703", "active": true, "sortOrder": 12 },
-    { "id": "art_013", "name": "Schwedensalat", "price": 2, "stock": 500, "warningStock": 5, "category": "Salat", "categoryColor": "#0ea5e9", "active": true, "sortOrder": 13 }
+    {
+      "id": "art_001",
+      "name": "Paprikaschnitzel mit Pommes",
+      "price": 12,
+      "stock": 500,
+      "warningStock": 5,
+      "category": "Schnitzel",
+      "categoryColor": "#e32626",
+      "active": true,
+      "sortOrder": 1
+    },
+    {
+      "id": "art_002",
+      "name": "Rahmschnitzel mit Pommes",
+      "price": 12,
+      "stock": 499,
+      "warningStock": 5,
+      "category": "Schnitzel",
+      "categoryColor": "#e32626",
+      "active": true,
+      "sortOrder": 2
+    },
+    {
+      "id": "art_003",
+      "name": "Kochkäseschnitzel mit Brot",
+      "price": 12,
+      "stock": 500,
+      "warningStock": 5,
+      "category": "Schnitzel",
+      "categoryColor": "#e32626",
+      "active": true,
+      "sortOrder": 3
+    },
+    {
+      "id": "art_004",
+      "name": "Hackbraten mit Soße und Brot",
+      "price": 8.5,
+      "stock": 499,
+      "warningStock": 5,
+      "category": "Küche",
+      "categoryColor": "#f97316",
+      "active": true,
+      "sortOrder": 4
+    },
+    {
+      "id": "art_005",
+      "name": "Bratwurst mit Brötchen/Brot",
+      "price": 4,
+      "stock": 497,
+      "warningStock": 5,
+      "category": "Grill",
+      "categoryColor": "#ffb703",
+      "active": true,
+      "sortOrder": 5
+    },
+    {
+      "id": "art_006",
+      "name": "Rindswurst mit Brötchen/Brot",
+      "price": 4,
+      "stock": 500,
+      "warningStock": 5,
+      "category": "Grill",
+      "categoryColor": "#ffb703",
+      "active": true,
+      "sortOrder": 6
+    },
+    {
+      "id": "art_007",
+      "name": "Pommes",
+      "price": 3,
+      "stock": 500,
+      "warningStock": 10,
+      "category": "Beilagen",
+      "categoryColor": "#22c55e",
+      "active": true,
+      "sortOrder": 7
+    },
+    {
+      "id": "art_008",
+      "name": "Kochkäse mit Brot",
+      "price": 4,
+      "stock": 500,
+      "warningStock": 5,
+      "category": "Beilagen",
+      "categoryColor": "#22c55e",
+      "active": true,
+      "sortOrder": 8
+    },
+    {
+      "id": "art_009",
+      "name": "Pinsa Salami",
+      "price": 8.5,
+      "stock": 500,
+      "warningStock": 5,
+      "category": "Pinsa",
+      "categoryColor": "#8b5cf6",
+      "active": true,
+      "sortOrder": 9
+    },
+    {
+      "id": "art_010",
+      "name": "Pinsa vegetarisch",
+      "price": 8.5,
+      "stock": 500,
+      "warningStock": 5,
+      "category": "Pinsa",
+      "categoryColor": "#8b5cf6",
+      "active": true,
+      "sortOrder": 10
+    },
+    {
+      "id": "art_011",
+      "name": "Feta Grillpfännchen",
+      "price": 6,
+      "stock": 500,
+      "warningStock": 5,
+      "category": "Vegetarisch",
+      "categoryColor": "#14b8a6",
+      "active": true,
+      "sortOrder": 11
+    },
+    {
+      "id": "art_012",
+      "name": "Currywurst",
+      "price": 4.5,
+      "stock": 500,
+      "warningStock": 5,
+      "category": "Grill",
+      "categoryColor": "#ffb703",
+      "active": true,
+      "sortOrder": 12
+    },
+    {
+      "id": "art_013",
+      "name": "Schwedensalat",
+      "price": 2,
+      "stock": 500,
+      "warningStock": 5,
+      "category": "Salat",
+      "categoryColor": "#0ea5e9",
+      "active": true,
+      "sortOrder": 13
+    }
   ],
-  "orders": [],
+  "orders": [
+    {
+      "id": "ord_1779988136254_11084e",
+      "createdAt": "2026-05-28T17:08:56.254Z",
+      "cashierId": "usr_admin",
+      "status": "paid",
+      "paidAmount": 40,
+      "changeAmount": 15.5,
+      "total": 24.5,
+      "items": [
+        {
+          "id": "itm_1779988119578_f07505",
+          "articleId": "art_001",
+          "name": "Paprikaschnitzel mit Pommes",
+          "quantity": 1,
+          "unitPrice": 12,
+          "lineTotal": 12,
+          "isFree": false
+        },
+        {
+          "id": "itm_1779988119578_9cc447",
+          "articleId": "art_006",
+          "name": "Rindswurst mit Brötchen/Brot",
+          "quantity": 1,
+          "unitPrice": 4,
+          "lineTotal": 4,
+          "isFree": false
+        },
+        {
+          "id": "itm_1779988119578_42c54a",
+          "articleId": "art_009",
+          "name": "Pinsa Salami",
+          "quantity": 1,
+          "unitPrice": 8.5,
+          "lineTotal": 8.5,
+          "isFree": false
+        }
+      ]
+    },
+    {
+      "id": "ord_1780038233265_b88e93",
+      "createdAt": "2026-05-29T07:03:53.265Z",
+      "cashierId": "usr_admin",
+      "status": "paid",
+      "paidAmount": 200,
+      "changeAmount": 167.5,
+      "total": 32.5,
+      "items": [
+        {
+          "id": "itm_1780038187627_6c05b3",
+          "articleId": "art_002",
+          "name": "Rahmschnitzel mit Pommes",
+          "quantity": 1,
+          "unitPrice": 12,
+          "lineTotal": 12,
+          "isFree": false
+        },
+        {
+          "id": "itm_1780038187627_fafae0",
+          "articleId": "art_004",
+          "name": "Hackbraten mit Soße und Brot",
+          "quantity": 1,
+          "unitPrice": 8.5,
+          "lineTotal": 8.5,
+          "isFree": false
+        },
+        {
+          "id": "itm_1780038187627_84dbef",
+          "articleId": "art_005",
+          "name": "Bratwurst mit Brötchen/Brot",
+          "quantity": 3,
+          "unitPrice": 4,
+          "lineTotal": 12,
+          "isFree": false
+        }
+      ]
+    }
+  ],
   "cancellations": [],
-  "dayReports": [],
+  "dayReports": [
+    {
+      "id": "day_1780032436229_c28b73",
+      "createdAt": "2026-05-29T05:27:16.229Z",
+      "eventName": "Feuerwehrfest",
+      "clubName": "Freiwillige Feuerwehr Zellhausen",
+      "logoDataUrl": "",
+      "total": 32.5,
+      "orderCount": 1,
+      "orders": [
+        {
+          "id": "ord_1780032426610_b8edc4",
+          "createdAt": "2026-05-29T05:27:06.610Z",
+          "cashierId": "usr_admin",
+          "status": "paid",
+          "paidAmount": 32.5,
+          "changeAmount": 0,
+          "total": 32.5,
+          "items": [
+            {
+              "id": "itm_1780032421467_12825c",
+              "articleId": "art_003",
+              "name": "Kochkäseschnitzel mit Brot",
+              "quantity": 1,
+              "unitPrice": 12,
+              "lineTotal": 12,
+              "isFree": false
+            },
+            {
+              "id": "itm_1780032421467_06babc",
+              "articleId": "art_002",
+              "name": "Rahmschnitzel mit Pommes",
+              "quantity": 1,
+              "unitPrice": 12,
+              "lineTotal": 12,
+              "isFree": false
+            },
+            {
+              "id": "itm_1780032421467_c157c0",
+              "articleId": "art_004",
+              "name": "Hackbraten mit Soße und Brot",
+              "quantity": 1,
+              "unitPrice": 8.5,
+              "lineTotal": 8.5,
+              "isFree": false
+            }
+          ]
+        }
+      ]
+    }
+  ],
   "settings": {
     "clubName": "Freiwillige Feuerwehr Zellhausen",
     "eventName": "Feuerwehrfest",
@@ -49,13 +306,35 @@
     "menuVersion": 5,
     "activeEventFile": "fest.json",
     "categories": [
-      { "name": "Schnitzel", "color": "#e32626" },
-      { "name": "Küche", "color": "#f97316" },
-      { "name": "Grill", "color": "#ffb703" },
-      { "name": "Beilagen", "color": "#22c55e" },
-      { "name": "Pinsa", "color": "#8b5cf6" },
-      { "name": "Vegetarisch", "color": "#14b8a6" },
-      { "name": "Salat", "color": "#0ea5e9" }
-    ]
+      {
+        "name": "Beilagen",
+        "color": "#22c55e"
+      },
+      {
+        "name": "Grill",
+        "color": "#ffb703"
+      },
+      {
+        "name": "Küche",
+        "color": "#f97316"
+      },
+      {
+        "name": "Pinsa",
+        "color": "#8b5cf6"
+      },
+      {
+        "name": "Salat",
+        "color": "#0ea5e9"
+      },
+      {
+        "name": "Schnitzel",
+        "color": "#e32626"
+      },
+      {
+        "name": "Vegetarisch",
+        "color": "#14b8a6"
+      }
+    ],
+    "updatedAt": "2026-05-29T07:03:53.280Z"
   }
 }
