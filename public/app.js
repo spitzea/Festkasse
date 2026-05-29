@@ -1,4 +1,6 @@
 const DEFAULT_RESET_STOCK = 500;
+const MAX_CATEGORIES = 5;
+const SESSION_STORAGE_KEY = "festkasseSessionUser";
 
 const seedData = {
   users: [
@@ -10,15 +12,15 @@ const seedData = {
     { id: "art_002", name: "Rahmschnitzel mit Pommes", price: 12, stock: 500, warningStock: 5, category: "Schnitzel", categoryColor: "#e32626", active: true },
     { id: "art_003", name: "Kochkäseschnitzel mit Brot", price: 12, stock: 500, warningStock: 5, category: "Schnitzel", categoryColor: "#e32626", active: true },
     { id: "art_004", name: "Hackbraten mit Soße und Brot", price: 8.5, stock: 500, warningStock: 5, category: "Küche", categoryColor: "#f97316", active: true },
-    { id: "art_005", name: "Bratwurst mit Brötchen/Brot", price: 4, stock: 500, warningStock: 5, category: "Grill", categoryColor: "#ffb703", active: true },
-    { id: "art_006", name: "Rindswurst mit Brötchen/Brot", price: 4, stock: 500, warningStock: 5, category: "Grill", categoryColor: "#ffb703", active: true },
+    { id: "art_005", name: "Bratwurst mit Brötchen/Brot", price: 4, stock: 500, warningStock: 5, category: "Wurst", categoryColor: "#ffb703", active: true },
+    { id: "art_006", name: "Rindswurst mit Brötchen/Brot", price: 4, stock: 500, warningStock: 5, category: "Wurst", categoryColor: "#ffb703", active: true },
     { id: "art_007", name: "Pommes", price: 3, stock: 500, warningStock: 10, category: "Beilagen", categoryColor: "#22c55e", active: true },
     { id: "art_008", name: "Kochkäse mit Brot", price: 4, stock: 500, warningStock: 5, category: "Beilagen", categoryColor: "#22c55e", active: true },
     { id: "art_009", name: "Pinsa Salami", price: 8.5, stock: 500, warningStock: 5, category: "Pinsa", categoryColor: "#8b5cf6", active: true },
     { id: "art_010", name: "Pinsa vegetarisch", price: 8.5, stock: 500, warningStock: 5, category: "Pinsa", categoryColor: "#8b5cf6", active: true },
-    { id: "art_011", name: "Feta Grillpfännchen", price: 6, stock: 500, warningStock: 5, category: "Vegetarisch", categoryColor: "#14b8a6", active: true },
-    { id: "art_012", name: "Currywurst", price: 4.5, stock: 500, warningStock: 5, category: "Grill", categoryColor: "#ffb703", active: true },
-    { id: "art_013", name: "Schwedensalat", price: 2, stock: 500, warningStock: 5, category: "Salat", categoryColor: "#0ea5e9", active: true }
+    { id: "art_011", name: "Feta Grillpfännchen", price: 6, stock: 500, warningStock: 5, category: "Beilagen", categoryColor: "#22c55e", active: true },
+    { id: "art_012", name: "Currywurst", price: 4.5, stock: 500, warningStock: 5, category: "Wurst", categoryColor: "#ffb703", active: true },
+    { id: "art_013", name: "Schwedensalat", price: 2, stock: 500, warningStock: 5, category: "Beilagen", categoryColor: "#22c55e", active: true }
   ],
   orders: [],
   cancellations: [],
@@ -29,6 +31,9 @@ const seedData = {
     currency: "EUR",
     defaultWarningStock: 5,
     printerName: "Browserdruck",
+    printerMode: "browser",
+    printerPort: "",
+    printOutputDir: "data/prints",
     receiptFooter: "Danke und Gut Schlauch!",
     logoDataUrl: "",
     calculatorName: "name",
@@ -39,11 +44,9 @@ const seedData = {
     categories: [
       { name: "Schnitzel", color: "#e32626" },
       { name: "Küche", color: "#f97316" },
-      { name: "Grill", color: "#ffb703" },
+      { name: "Wurst", color: "#ffb703" },
       { name: "Beilagen", color: "#22c55e" },
-      { name: "Pinsa", color: "#8b5cf6" },
-      { name: "Vegetarisch", color: "#14b8a6" },
-      { name: "Salat", color: "#0ea5e9" }
+      { name: "Pinsa", color: "#8b5cf6" }
     ]
   }
 };
@@ -57,6 +60,7 @@ let paidAmount = "";
 let toastTimer = null;
 let clockTimer = null;
 const adminDirtySections = new Set();
+const adminSavedSections = new Set();
 let eventCatalog = null;
 let bootError = "";
 
@@ -229,6 +233,42 @@ function canManage() {
   return sessionUser && sessionUser.role === "admin";
 }
 
+function restoreSessionUser() {
+  const rawSession = window.sessionStorage.getItem(SESSION_STORAGE_KEY);
+  if (!rawSession) return;
+
+  try {
+    const storedUser = JSON.parse(rawSession);
+    const matchingUser = state.users.find((user) =>
+      user.active &&
+      user.id === storedUser.id &&
+      user.username === storedUser.username &&
+      user.role === storedUser.role
+    );
+    sessionUser = matchingUser || null;
+  } catch (error) {
+    sessionUser = null;
+  }
+
+  if (!sessionUser) {
+    window.sessionStorage.removeItem(SESSION_STORAGE_KEY);
+  }
+}
+
+function rememberSessionUser() {
+  if (!sessionUser) return;
+  window.sessionStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify({
+    id: sessionUser.id,
+    username: sessionUser.username,
+    role: sessionUser.role
+  }));
+}
+
+function clearSessionUser() {
+  sessionUser = null;
+  window.sessionStorage.removeItem(SESSION_STORAGE_KEY);
+}
+
 function render() {
   const app = document.querySelector("#app");
   if (bootError) {
@@ -281,7 +321,12 @@ function loginTemplate() {
             <input id="password" name="password" type="password" autocomplete="current-password" required />
           </div>
           <button class="primary-button" type="submit">Einloggen</button>
-          <p class="hint">Demo: kasse/kasse123, admin/admin123</p>
+          <div class="login-access">
+            <strong>Standardzugänge</strong>
+            <span>Kasse: <code>kasse</code> / <code>kasse123</code></span>
+            <span>Admin: <code>admin</code> / <code>admin123</code></span>
+            <small>Nach einer Änderung gelten die im Adminbereich gesetzten Passwörter.</small>
+          </div>
           <div class="login-contact">
             <strong>Rechner: ${state.settings.calculatorName || "-"}</strong>
             <span>Telefonnummer: ${state.settings.calculatorPhone || "-"}</span>
@@ -462,6 +507,9 @@ function renderAdmin() {
     analysis: analysisTemplate,
     articles: articleManagementTemplate,
     categories: categoryManagementTemplate,
+    users: userAccessTemplate,
+    print: printSettingsTemplate,
+    data: dataManagementTemplate,
     settings: settingsTemplate
   };
   const content = (adminTemplates[activeAdminSection] || analysisTemplate)();
@@ -477,6 +525,9 @@ function renderAdmin() {
             <button class="tab-button ${activeAdminSection === "analysis" ? "active" : ""}" data-admin-section="analysis">Tagesauswertung</button>
             <button class="tab-button ${activeAdminSection === "articles" ? "active" : ""}" data-admin-section="articles">Artikel verwalten</button>
             <button class="tab-button ${activeAdminSection === "categories" ? "active" : ""}" data-admin-section="categories">Kategorien verwalten</button>
+            <button class="tab-button ${activeAdminSection === "users" ? "active" : ""}" data-admin-section="users">Benutzer & Passwörter</button>
+            <button class="tab-button ${activeAdminSection === "print" ? "active" : ""}" data-admin-section="print">Drucken</button>
+            <button class="tab-button ${activeAdminSection === "data" ? "active" : ""}" data-admin-section="data">Daten & Vorlagen</button>
             <button class="tab-button ${activeAdminSection === "settings" ? "active" : ""}" data-admin-section="settings">Einstellungen</button>
           </nav>
         </div>
@@ -488,9 +539,13 @@ function renderAdmin() {
 }
 
 function dirtyIndicator(section) {
-  return adminDirtySections.has(section)
-    ? `<span class="unsaved-badge" data-unsaved="${section}">Ungespeicherte Änderungen</span>`
-    : "";
+  if (adminDirtySections.has(section)) {
+    return `<span class="unsaved-badge" data-unsaved="${section}">Ungespeicherte Änderungen</span>`;
+  }
+  if (adminSavedSections.has(section)) {
+    return `<span class="saved-badge" data-saved="${section}">Gespeichert</span>`;
+  }
+  return "";
 }
 
 function articleManagementTemplate() {
@@ -502,7 +557,7 @@ function articleManagementTemplate() {
         </div>
         <div class="header-actions">
           ${dirtyIndicator("articles")}
-          <button class="primary-button" data-save-articles>Speichern</button>
+          <button class="action-button" data-save-articles>Speichern</button>
         </div>
       </div>
       ${articleFormTemplate()}
@@ -520,15 +575,17 @@ function categoryOptionsTemplate(selectedCategory = "") {
 }
 
 function categoryManagementTemplate() {
+  const categoryLimitReached = state.settings.categories.length >= MAX_CATEGORIES;
   return `
     <section class="panel">
       <div class="panel-header">
         <div>
           <h2>Kategorien verwalten</h2>
+          <p>${state.settings.categories.length} von ${MAX_CATEGORIES} Kategorien belegt.</p>
         </div>
         <div class="header-actions">
           ${dirtyIndicator("categories")}
-          <button class="primary-button" data-save-categories>Speichern</button>
+          <button class="action-button" data-save-categories>Speichern</button>
         </div>
       </div>
       <form class="category-create" data-category-form>
@@ -540,8 +597,9 @@ function categoryManagementTemplate() {
           <label>Farbe</label>
           <input name="color" type="color" value="#e32626" />
         </div>
-        <button class="primary-button" type="submit">Kategorie anlegen</button>
+        <button class="action-button" type="submit">Kategorie anlegen</button>
       </form>
+      ${categoryLimitReached ? `<p class="category-limit-note">Maximal ${MAX_CATEGORIES} Kategorien sind erlaubt, damit die Kassenansicht ruhig und planbar bleibt.</p>` : ""}
       <div class="category-list">
         ${state.settings.categories.map((category) => `
           <form class="category-edit-card" data-edit-category="${category.name}" style="--category-color: ${category.color}">
@@ -573,7 +631,7 @@ function analysisTemplate() {
           <h2>Tagesauswertung</h2>
           <p>Normal, kostenlos und Summe auf einen Blick.</p>
         </div>
-        <button class="primary-button" data-print-report>Auswertung drucken</button>
+        <button class="action-button" data-print-report>Auswertung drucken</button>
         <button class="danger-button" data-reset-day ${orders.length ? "" : "disabled"}>Tageskasse abschließen</button>
       </div>
       <div class="stat-grid">
@@ -611,7 +669,7 @@ function dayReportHistoryTemplate() {
               <span>${new Date(report.createdAt).toLocaleString("de-DE")} - ${report.orderCount} Buchungen - ${money(report.total)}</span>
             </div>
             <div class="history-actions">
-              <button class="small-button" data-print-history="${report.id}">Drucken</button>
+              <button class="action-button small-button" data-print-history="${report.id}">Drucken</button>
               <button class="danger-button small-button" data-delete-history="${report.id}">Endgültig löschen</button>
             </div>
             <details class="history-details">
@@ -699,10 +757,11 @@ function settingsTemplate() {
         </div>
         <div class="header-actions">
           ${dirtyIndicator("settings")}
-          <button class="primary-button" data-save-settings>Speichern</button>
+          <button class="action-button" data-save-settings="settings">Speichern</button>
         </div>
       </div>
-      <form class="settings-form settings-form-wide" data-settings-form>
+      <form class="settings-form settings-overview-form" data-settings-form data-settings-section="settings">
+        <div class="settings-form-title">Festdaten</div>
         <div class="field">
           <label>Festname</label>
           <input name="eventName" value="${state.settings.eventName}" required />
@@ -713,8 +772,14 @@ function settingsTemplate() {
         </div>
         <div class="field">
           <label>Logo</label>
-          <input name="logo" type="file" accept="image/*" />
+          <div class="logo-upload-row">
+            <input name="logo" type="file" accept="image/*" />
+            <div class="logo-preview">
+              ${state.settings.logoDataUrl ? `<img src="${state.settings.logoDataUrl}" alt="Logo Vorschau" />` : "<span>Kein Logo hinterlegt</span>"}
+            </div>
+          </div>
         </div>
+        <div class="settings-form-title">Kassenhinweis</div>
         <div class="field">
           <label>Rechner</label>
           <input name="calculatorName" value="${state.settings.calculatorName}" />
@@ -727,20 +792,15 @@ function settingsTemplate() {
           <label>Hinweis</label>
           <textarea name="calculatorComment" maxlength="400" rows="5">${state.settings.calculatorComment || ""}</textarea>
         </div>
-        <div class="logo-preview">
-          ${state.settings.logoDataUrl ? `<img src="${state.settings.logoDataUrl}" alt="Logo Vorschau" />` : "<span>Kein Logo hinterlegt</span>"}
-        </div>
       </form>
-      ${userAccessTemplate()}
-      ${dataManagementTemplate()}
     </section>
   `;
 }
 
 function userAccessTemplate() {
   return `
-    <section class="data-panel">
-      <div class="section-header">
+    <section class="panel">
+      <div class="panel-header">
         <div>
           <h3>Benutzer & Passwörter</h3>
           <p>Passwörter werden nur als Hash in der Festdatei gespeichert.</p>
@@ -757,7 +817,7 @@ function userAccessTemplate() {
               <label>Neues Passwort</label>
               <input name="password" type="password" autocomplete="new-password" minlength="4" />
             </div>
-            <button class="primary-button small-button" type="submit">Passwort setzen</button>
+            <button class="action-button small-button" type="submit">Passwort setzen</button>
           </form>
         `).join("")}
       </div>
@@ -765,24 +825,61 @@ function userAccessTemplate() {
   `;
 }
 
+function printSettingsTemplate() {
+  return `
+    <section class="panel">
+      <div class="panel-header">
+        <div>
+          <h2>Drucken</h2>
+          <p>Browserdruck, Testdateien und Thermodrucker vorbereiten.</p>
+        </div>
+        <div class="header-actions">
+          ${dirtyIndicator("print")}
+          <button class="action-button" data-save-settings="print">Speichern</button>
+        </div>
+      </div>
+      <form class="settings-form settings-form-wide" data-settings-form data-settings-section="print">
+        <div class="field">
+          <label>Druckmodus</label>
+          <select name="printerMode">
+            <option value="browser" ${state.settings.printerMode === "browser" ? "selected" : ""}>Browserdruck</option>
+            <option value="textfile" ${state.settings.printerMode === "textfile" ? "selected" : ""}>Textdatei-Testdruck</option>
+            <option value="serial" ${state.settings.printerMode === "serial" ? "selected" : ""}>Serieller Thermodrucker</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Drucker-Port</label>
+          <input name="printerPort" value="${state.settings.printerPort || ""}" placeholder="COM3 oder /dev/ttyUSB0" />
+        </div>
+        <div class="field">
+          <label>Testdruck-Verzeichnis</label>
+          <input name="printOutputDir" value="${state.settings.printOutputDir || "data/prints"}" />
+        </div>
+        <div class="field settings-test-print">
+          <button class="action-button" type="button" data-test-print>Testbon als TXT schreiben</button>
+        </div>
+      </form>
+    </section>
+  `;
+}
+
 function dataManagementTemplate() {
   return `
-    <section class="data-panel">
-      <div class="section-header">
+    <section class="panel data-panel">
+      <div class="panel-header">
         <div>
           <h3>Daten & Vorlagen</h3>
-          <p>Aktuelles Fest sichern, Vorlagen laden oder fremde Festdaten löschen.</p>
+          <p>Aktuelles Fest speichern oder vorhandene Vorlagen laden.</p>
         </div>
-        <button class="ghost-button small-button" data-refresh-events>Aktualisieren</button>
       </div>
       <div class="data-actions">
-        <button class="primary-button" data-save-current-event>Aktuelles Fest sichern</button>
-        <button class="ghost-button" data-new-default-event>Neues Fest aus Default starten</button>
-        <button class="danger-button" data-load-default-event>Default-Daten laden</button>
       </div>
-      <div class="field data-new-field">
-        <label>Neues Fest als Name</label>
-        <input data-new-event-name value="${state.settings.eventName}" />
+      <div class="data-save-row">
+        <div class="field data-new-field">
+          <label>Vorlagenname</label>
+          <input data-new-event-name value="${state.settings.eventName}" />
+        </div>
+        <button class="action-button" data-save-current-event>Aktuelles Fest speichern</button>
       </div>
       <div class="event-list" data-event-list>
         ${eventCatalogTemplate()}
@@ -796,24 +893,40 @@ function eventCatalogTemplate() {
     return `<p class="hint">Vorlagen werden geladen...</p>`;
   }
 
-  const rows = [...(eventCatalog.events || []), ...(eventCatalog.archive || [])];
-  if (!rows.length) {
-    return `<p class="hint">Noch keine gespeicherten Feste vorhanden.</p>`;
-  }
+  const rows = [
+    {
+      type: "defaults",
+      file: "defaults.json",
+      eventName: "Default",
+      clubName: eventCatalog.defaults?.clubName || "Grunddaten",
+      locked: true
+    },
+    ...(eventCatalog.events || []),
+    ...(eventCatalog.archive || [])
+  ];
 
   return rows.map((event) => `
     <article class="event-card">
       <div>
         <strong>${event.eventName}</strong>
-        <span>${event.clubName || "-"} · ${event.file} · ${event.type === "archive" ? "Archiv" : "Fest"}</span>
+        <span>${eventMetaTemplate(event)}</span>
       </div>
       <div class="event-actions">
-        <button class="small-button" data-load-event="${event.file}">Fest laden</button>
-        <button class="small-button" data-template-event="${event.file}">Als Vorlage</button>
-        <button class="danger-button small-button" data-delete-event="${event.file}">Löschen</button>
+        ${event.type === "defaults"
+          ? `<button class="action-button small-button" data-load-default-event>Fest laden</button>`
+          : `<button class="action-button small-button" data-template-event="${event.file}">Fest laden</button>
+             <button class="danger-button small-button" data-delete-event="${event.file}">Löschen</button>`}
       </div>
     </article>
   `).join("");
+}
+
+function eventMetaTemplate(event) {
+  const typeLabel = event.type === "archive" ? "Archiv" : event.type === "defaults" ? "Systemvorlage" : "Vorlage";
+  const date = event.updatedAt
+    ? new Date(event.updatedAt)
+    : new Date();
+  return `${event.clubName || "-"} - ${event.sourceEventName || event.eventName || event.file} - ${date.toLocaleString("de-DE", { dateStyle: "short", timeStyle: "short" })} - ${typeLabel}`;
 }
 
 function articleFormTemplate() {
@@ -839,7 +952,7 @@ function articleFormTemplate() {
         <label>Kategorie</label>
         <select name="category">${categoryOptionsTemplate()}</select>
       </div>
-      <button class="primary-button" type="submit">Artikel anlegen</button>
+      <button class="action-button" type="submit">Artikel anlegen</button>
     </form>
   `;
 }
@@ -903,6 +1016,7 @@ function bindLogin() {
 
     const payload = await response.json();
     sessionUser = payload.user;
+    rememberSessionUser();
     activeView = "cashier";
     state = await loadState();
     render();
@@ -918,7 +1032,7 @@ function bindShell() {
   });
 
   document.querySelector("[data-logout]").addEventListener("click", () => {
-    sessionUser = null;
+    clearSessionUser();
     cart = [];
     paidAmount = "";
     render();
@@ -1000,22 +1114,22 @@ function bindAdmin() {
     button.addEventListener("click", () => deleteArchivedReport(button.dataset.deleteHistory));
   });
 
-  document.querySelector("[data-save-settings]")?.addEventListener("click", saveSettings);
-  document.querySelector("[data-settings-form]")?.addEventListener("input", () => markAdminDirty("settings"));
-  document.querySelector("[data-settings-form]")?.addEventListener("change", () => markAdminDirty("settings"));
-  document.querySelector("[data-settings-form]")?.addEventListener("submit", (event) => {
-    event.preventDefault();
-    saveSettings();
+  document.querySelectorAll("[data-save-settings]").forEach((button) => {
+    button.addEventListener("click", () => saveSettings(button.dataset.saveSettings || activeAdminSection, button));
   });
-  document.querySelector("[data-refresh-events]")?.addEventListener("click", refreshEventCatalog);
-  document.querySelector("[data-save-current-event]")?.addEventListener("click", saveCurrentEvent);
-  document.querySelector("[data-new-default-event]")?.addEventListener("click", startDefaultEvent);
-  document.querySelector("[data-load-default-event]")?.addEventListener("click", loadDefaultEvent);
+  document.querySelector("[data-test-print]")?.addEventListener("click", (event) => testPrint(event.currentTarget));
+  document.querySelectorAll("[data-settings-form]").forEach((formElement) => {
+    const section = formElement.dataset.settingsSection || activeAdminSection;
+    formElement.addEventListener("input", () => markAdminDirty(section));
+    formElement.addEventListener("change", () => markAdminDirty(section));
+    formElement.addEventListener("submit", (event) => {
+      event.preventDefault();
+      saveSettings(section, event.submitter);
+    });
+  });
+  document.querySelector("[data-save-current-event]")?.addEventListener("click", (event) => saveCurrentEvent(event.currentTarget));
   document.querySelectorAll("[data-password-user]").forEach((formElement) => {
     formElement.addEventListener("submit", setUserPassword);
-  });
-  document.querySelectorAll("[data-load-event]").forEach((button) => {
-    button.addEventListener("click", () => loadManagedEvent(button.dataset.loadEvent, "full"));
   });
   document.querySelectorAll("[data-template-event]").forEach((button) => {
     button.addEventListener("click", () => loadManagedEvent(button.dataset.templateEvent, "template"));
@@ -1023,15 +1137,20 @@ function bindAdmin() {
   document.querySelectorAll("[data-delete-event]").forEach((button) => {
     button.addEventListener("click", () => deleteManagedEvent(button.dataset.deleteEvent));
   });
-  if (activeAdminSection === "settings") {
+  document.querySelector("[data-load-default-event]")?.addEventListener("click", loadDefaultEvent);
+  if (activeAdminSection === "data") {
     refreshEventCatalog();
   }
 
   document.querySelector("[data-save-categories]")?.addEventListener("click", saveCategories);
   document.querySelector("[data-save-articles]")?.addEventListener("click", saveArticles);
 
-  document.querySelector("[data-category-form]")?.addEventListener("submit", (event) => {
+  document.querySelector("[data-category-form]")?.addEventListener("submit", async (event) => {
     event.preventDefault();
+    if (state.settings.categories.length >= MAX_CATEGORIES) {
+      showToast(`Fehler: Maximal ${MAX_CATEGORIES} Kategorien erlaubt.`);
+      return;
+    }
     const form = new FormData(event.currentTarget);
     const name = String(form.get("name")).trim();
     if (!name || state.settings.categories.some((category) => category.name === name)) {
@@ -1040,7 +1159,7 @@ function bindAdmin() {
     }
     state.settings.categories.push({ name, color: String(form.get("color")) || colorForCategory(name) });
     state.settings.categories = normalizeCategories(state.settings.categories, state.articles);
-    saveState();
+    if (!(await saveState())) return;
     clearAdminDirty("categories");
     showToast("Kategorie angelegt.");
     renderAdmin();
@@ -1113,17 +1232,54 @@ function bindAdmin() {
 }
 
 function markAdminDirty(section) {
+  adminSavedSections.delete(section);
   if (adminDirtySections.has(section)) return;
   adminDirtySections.add(section);
-  const button = document.querySelector(`[data-save-${section}]`);
-  const actions = button?.closest(".header-actions");
-  if (actions && !actions.querySelector("[data-unsaved]")) {
-    actions.insertAdjacentHTML("afterbegin", dirtyIndicator(section));
-  }
+  updateAdminSaveFeedback(section);
 }
 
-function clearAdminDirty(section) {
+function clearAdminDirty(section, showSaved = true) {
   adminDirtySections.delete(section);
+  if (showSaved) {
+    adminSavedSections.add(section);
+    window.setTimeout(() => {
+      adminSavedSections.delete(section);
+      updateAdminSaveFeedback(section);
+    }, 2400);
+  }
+  updateAdminSaveFeedback(section);
+}
+
+function getAdminSaveButton(section) {
+  return document.querySelector(`[data-save-${section}], [data-save-settings="${section}"]`);
+}
+
+function updateAdminSaveFeedback(section) {
+  const button = getAdminSaveButton(section);
+  const actions = button?.closest(".header-actions");
+  if (!actions) return;
+
+  actions.querySelectorAll("[data-unsaved], [data-saved]").forEach((item) => item.remove());
+  const indicator = dirtyIndicator(section);
+  if (indicator) {
+    actions.insertAdjacentHTML("afterbegin", indicator);
+  }
+
+  const saved = adminSavedSections.has(section) && !adminDirtySections.has(section);
+  button.textContent = saved ? "Gespeichert" : "Speichern";
+  button.classList.toggle("saved-button", saved);
+}
+
+function setButtonState(button, label, disabled = true) {
+  if (!button) return () => {};
+  const originalLabel = button.textContent;
+  const wasDisabled = button.disabled;
+  button.textContent = label;
+  button.disabled = disabled;
+  return (nextLabel = originalLabel) => {
+    button.textContent = nextLabel;
+    button.disabled = wasDisabled;
+  };
 }
 
 async function refreshEventCatalog() {
@@ -1141,9 +1297,6 @@ async function refreshEventCatalog() {
 }
 
 function bindEventCatalogActions() {
-  document.querySelectorAll("[data-load-event]").forEach((button) => {
-    button.addEventListener("click", () => loadManagedEvent(button.dataset.loadEvent, "full"));
-  });
   document.querySelectorAll("[data-template-event]").forEach((button) => {
     button.addEventListener("click", () => loadManagedEvent(button.dataset.templateEvent, "template"));
   });
@@ -1152,7 +1305,8 @@ function bindEventCatalogActions() {
   });
 }
 
-async function saveCurrentEvent() {
+async function saveCurrentEvent(button) {
+  const finishButton = setButtonState(button, "Speichern...");
   const name = document.querySelector("[data-new-event-name]")?.value || state.settings.eventName;
   const response = await fetch("/api/events/save", {
     method: "POST",
@@ -1160,34 +1314,26 @@ async function saveCurrentEvent() {
     body: JSON.stringify({ name })
   });
   if (!response.ok) {
+    finishButton();
     showToast("Fest konnte nicht gesichert werden.");
     return;
   }
   const payload = await response.json();
   state = normalizeState(payload.state);
   showToast(`Fest gesichert: ${payload.file}`);
+  finishButton("Gespeichert");
   await refreshEventCatalog();
-}
-
-async function startDefaultEvent() {
-  const eventName = document.querySelector("[data-new-event-name]")?.value || "Neues Fest";
-  if (!window.confirm(`Neues Fest "${eventName}" aus Default starten?\n\nAktuelle Verkäufe werden durch ein leeres Fest ersetzt.`)) return;
-  const response = await fetch("/api/events/new", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ eventName })
-  });
-  await applyEventResponse(response, "Neues Fest gestartet.");
+  window.setTimeout(() => finishButton(), 1200);
 }
 
 async function loadDefaultEvent() {
-  if (!window.confirm("Default-Daten laden?\n\nDas aktuelle Fest wird durch die Grunddaten ersetzt.")) return;
+  if (!window.confirm("Default als Vorlage laden?\n\nVerkäufe und Tagesabschlüsse werden geleert, Grundartikel und Einstellungen übernommen.")) return;
   const response = await fetch("/api/events/load", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ source: "defaults", mode: "template", eventName: state.settings.eventName })
   });
-  await applyEventResponse(response, "Default-Daten geladen.");
+  await applyEventResponse(response, "Default als Vorlage geladen.");
 }
 
 async function loadManagedEvent(file, mode) {
@@ -1235,9 +1381,11 @@ async function applyEventResponse(response, message) {
 
 async function setUserPassword(event) {
   event.preventDefault();
+  const finishButton = setButtonState(event.submitter, "Speichern...");
   const form = new FormData(event.currentTarget);
   const password = String(form.get("password") || "");
   if (password.length < 4) {
+    finishButton();
     showToast("Passwort bitte mit mindestens 4 Zeichen setzen.");
     return;
   }
@@ -1248,54 +1396,88 @@ async function setUserPassword(event) {
     body: JSON.stringify({ username, password })
   });
   if (!response.ok) {
+    finishButton();
     showToast("Passwort konnte nicht gespeichert werden.");
     return;
   }
   event.currentTarget.reset();
+  finishButton("Gespeichert");
   showToast(`Passwort für ${username} gespeichert.`);
+  window.setTimeout(() => finishButton(), 1200);
 }
 
-function saveSettings() {
+async function saveSettings(section = "settings", button = getAdminSaveButton(section)) {
+  const finishButton = setButtonState(button, "Speichern...");
   const formElement = document.querySelector("[data-settings-form]");
-  if (!formElement) return;
+  if (!formElement) {
+    finishButton();
+    return;
+  }
   const form = new FormData(formElement);
-    state.settings.eventName = String(form.get("eventName")).trim() || "Feuerwehrfest";
-    state.settings.clubName = String(form.get("clubName")).trim() || "Freiwillige Feuerwehr Zellhausen";
-    state.settings.calculatorName = String(form.get("calculatorName")).trim();
-    state.settings.calculatorPhone = String(form.get("calculatorPhone")).trim();
-    state.settings.calculatorComment = String(form.get("calculatorComment")).trim().slice(0, 400);
-
+    if (form.has("eventName")) state.settings.eventName = String(form.get("eventName")).trim() || "Feuerwehrfest";
+    if (form.has("clubName")) state.settings.clubName = String(form.get("clubName")).trim() || "Freiwillige Feuerwehr Zellhausen";
+    if (form.has("calculatorName")) state.settings.calculatorName = String(form.get("calculatorName")).trim();
+    if (form.has("calculatorPhone")) state.settings.calculatorPhone = String(form.get("calculatorPhone")).trim();
+    if (form.has("calculatorComment")) state.settings.calculatorComment = String(form.get("calculatorComment")).trim().slice(0, 400);
+    if (form.has("printerMode")) state.settings.printerMode = String(form.get("printerMode") || "browser");
+    if (form.has("printerPort")) state.settings.printerPort = String(form.get("printerPort") || "").trim();
+    if (form.has("printOutputDir")) state.settings.printOutputDir = String(form.get("printOutputDir") || "data/prints").trim() || "data/prints";
     const logo = form.get("logo");
     if (logo && logo.size) {
       const reader = new FileReader();
-      reader.addEventListener("load", () => {
+      reader.addEventListener("load", async () => {
     state.settings.logoDataUrl = reader.result;
-        saveState();
-        clearAdminDirty("settings");
+        if (!(await saveState())) {
+          finishButton();
+          return;
+        }
+        clearAdminDirty(section);
         showToast("Einstellungen gespeichert.");
+        finishButton("Gespeichert");
         render();
       });
       reader.readAsDataURL(logo);
       return;
     }
 
-    saveState();
-    clearAdminDirty("settings");
+    if (!(await saveState())) {
+      finishButton();
+      return;
+    }
+    clearAdminDirty(section);
     showToast("Einstellungen gespeichert.");
+    finishButton("Gespeichert");
     render();
 }
 
-function saveCategories() {
+async function saveCategories() {
+  const finishButton = setButtonState(getAdminSaveButton("categories"), "Speichern...");
+  const categoryCreateForm = document.querySelector("[data-category-form]");
+  const pendingCategoryName = categoryCreateForm
+    ? String(new FormData(categoryCreateForm).get("name") || "").trim()
+    : "";
+  if (pendingCategoryName) {
+    finishButton();
+    if (state.settings.categories.length >= MAX_CATEGORIES) {
+      showToast(`Fehler: Maximal ${MAX_CATEGORIES} Kategorien erlaubt.`);
+      return;
+    }
+    showToast("Neue Kategorie bitte mit „Kategorie anlegen“ hinzufügen.");
+    return;
+  }
+
   const changes = [];
   for (const formElement of document.querySelectorAll("[data-edit-category]")) {
     const form = new FormData(formElement);
     const categoryName = formElement.dataset.editCategory;
     const newName = String(form.get("name")).trim();
       if (!newName) {
+        finishButton();
         showToast("Kategoriename darf nicht leer sein.");
         return;
       }
       if (newName !== categoryName && state.settings.categories.some((item) => item.name === newName)) {
+        finishButton();
         showToast("Kategorie existiert schon.");
         return;
       }
@@ -1317,13 +1499,18 @@ function saveCategories() {
     });
 
   state.settings.categories = normalizeCategories(state.settings.categories, state.articles);
-  saveState();
+  if (!(await saveState())) {
+    finishButton();
+    return;
+  }
   clearAdminDirty("categories");
   showToast("Kategorien gespeichert.");
+  finishButton("Gespeichert");
   renderAdmin();
 }
 
-function saveArticles() {
+async function saveArticles() {
+  const finishButton = setButtonState(getAdminSaveButton("articles"), "Speichern...");
   document.querySelectorAll("[data-edit-article]").forEach((formElement) => {
       const form = new FormData(formElement);
       const article = state.articles.find((item) => item.id === formElement.dataset.editArticle);
@@ -1336,9 +1523,13 @@ function saveArticles() {
       article.categoryColor = getCategoryColor(article.category);
       article.active = form.get("active") === "true";
     });
-  saveState();
+  if (!(await saveState())) {
+    finishButton();
+    return;
+  }
   clearAdminDirty("articles");
   showToast("Artikel gespeichert.");
+  finishButton("Gespeichert");
   renderAdmin();
 }
 
@@ -1363,8 +1554,12 @@ function moveArticle(articleId, direction) {
 
 function ensureCategory(name, color = colorForCategory(name)) {
   if (!state.settings.categories.some((category) => category.name === name)) {
+    if (state.settings.categories.length >= MAX_CATEGORIES) {
+      return false;
+    }
     state.settings.categories.push({ name, color });
   }
+  return true;
 }
 
 function deleteCategory(categoryName) {
@@ -1443,7 +1638,7 @@ function cancelCart() {
   renderCashier();
 }
 
-function checkout(isFree) {
+async function checkout(isFree) {
   if (!cart.length) return;
 
   // Kostenlose Buchungen werden als eigene Order Items markiert, damit die Auswertung sie sauber trennen kann.
@@ -1469,7 +1664,7 @@ function checkout(isFree) {
     }
   }
 
-  if (!printReceipt(items, total, isFree)) {
+  if (!(await printReceipt(items, total, isFree))) {
     return;
   }
 
@@ -1497,8 +1692,34 @@ function checkout(isFree) {
   renderCashier();
 }
 
-function printReceipt(items, total, isFree) {
+async function printReceipt(items, total, isFree) {
   const receiptTime = new Date();
+  if (state.settings.printerMode === "textfile" || state.settings.printerMode === "serial") {
+    const receipts = items.flatMap((item) =>
+      Array.from({ length: item.quantity }, () => ({
+        articleName: item.name,
+        price: item.unitPrice,
+        isFree,
+        createdAt: receiptTime.toISOString()
+      }))
+    );
+    const response = await fetch("/api/print/receipts", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ settings: state.settings, receipts })
+    });
+    if (!response.ok) {
+      const payload = await response.json().catch(() => ({}));
+      showToast(payload.error || "Drucken fehlgeschlagen.");
+      return false;
+    }
+    const payload = await response.json();
+    if (payload.mode === "textfile" && payload.files?.length) {
+      showToast(`${payload.files.length} Bon-Datei(en) geschrieben.`);
+    }
+    return true;
+  }
+
   const receipts = items.flatMap((item) =>
     Array.from({ length: item.quantity }, () => receiptTemplate(item, receiptTime, isFree))
   ).join("");
@@ -1509,6 +1730,35 @@ function printReceipt(items, total, isFree) {
     </section>
   `);
   return true;
+}
+
+async function testPrint(button) {
+  const finishButton = setButtonState(button, "Schreibe...");
+  const formElement = document.querySelector("[data-settings-form]");
+  const form = formElement ? new FormData(formElement) : new FormData();
+  const settings = {
+    ...state.settings,
+    printerMode: String(form.get("printerMode") || state.settings.printerMode || "browser"),
+    printerPort: String(form.get("printerPort") || state.settings.printerPort || "").trim(),
+    printOutputDir: String(form.get("printOutputDir") || state.settings.printOutputDir || "data/prints").trim()
+  };
+
+  const response = await fetch("/api/print/test", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ settings })
+  });
+
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    finishButton();
+    showToast(payload.error || "Testdruck fehlgeschlagen.");
+    return;
+  }
+
+  finishButton("Geschrieben");
+  showToast(payload.files?.length ? `Testbon geschrieben: ${payload.files[0]}` : "Testdruck ausgeführt.");
+  window.setTimeout(() => finishButton(), 1200);
 }
 
 function receiptTemplate(item, receiptTime, isFree) {
@@ -1646,19 +1896,55 @@ function renderPrint(html) {
   window.setTimeout(clearPrintRoot, 5000);
 }
 
-function showToast(message) {
+function inferToastType(message) {
+  const text = String(message || "").toLowerCase();
+  if (
+    text.includes("fehler") ||
+    text.includes("fehlgeschlagen") ||
+    text.includes("konnte nicht") ||
+    text.includes("nicht genug") ||
+    text.includes("reicht nicht") ||
+    text.includes("darf nicht") ||
+    text.includes("existiert schon") ||
+    text.includes("mindestens") ||
+    text.includes("maximal")
+  ) {
+    return "error";
+  }
+  if (
+    text.includes("gespeichert") ||
+    text.includes("gesichert") ||
+    text.includes("geladen") ||
+    text.includes("gelöscht") ||
+    text.includes("angelegt") ||
+    text.includes("geschrieben") ||
+    text.includes("gebucht") ||
+    text.includes("abgeschlossen") ||
+    text.includes("archiviert") ||
+    text.includes("ausgeführt")
+  ) {
+    return "success";
+  }
+  return "info";
+}
+
+function showToast(message, type = inferToastType(message)) {
   const toast = document.querySelector("[data-toast]");
   if (!toast) return;
+  if (activeView === "cashier" && type !== "error" && type !== "warning") return;
 
   toast.textContent = message;
+  toast.classList.remove("toast-success", "toast-warning", "toast-error", "toast-info");
+  toast.classList.add(`toast-${type}`);
   toast.classList.remove("hidden");
   clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => toast.classList.add("hidden"), 2200);
+  toastTimer = setTimeout(() => toast.classList.add("hidden"), type === "error" ? 3600 : 2200);
 }
 
 async function init() {
   try {
     state = await loadState();
+    restoreSessionUser();
   } catch (error) {
     bootError = "Die Festdaten konnten nicht vom Server geladen werden. Bitte die App über npm start / localhost öffnen.";
   }

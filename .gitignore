@@ -1,0 +1,5 @@
+node_modules/
+data/archive/*.json
+data/events/*.json
+data/prints/*.txt
+*.log

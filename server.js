@@ -9,6 +9,7 @@ const publicDir = path.join(__dirname, "public");
 const dataDir = path.join(__dirname, "data");
 const eventsDir = path.join(dataDir, "events");
 const archiveDir = path.join(dataDir, "archive");
+const printsDir = path.join(dataDir, "prints");
 const defaultsPath = path.join(dataDir, "defaults.json");
 const activePath = path.join(dataDir, "fest.json");
 
@@ -46,15 +47,15 @@ const defaultState = {
     { id: "art_002", name: "Rahmschnitzel mit Pommes", price: 12, stock: 500, warningStock: 5, category: "Schnitzel", categoryColor: "#e32626", active: true, sortOrder: 2 },
     { id: "art_003", name: "Kochkäseschnitzel mit Brot", price: 12, stock: 500, warningStock: 5, category: "Schnitzel", categoryColor: "#e32626", active: true, sortOrder: 3 },
     { id: "art_004", name: "Hackbraten mit Soße und Brot", price: 8.5, stock: 500, warningStock: 5, category: "Küche", categoryColor: "#f97316", active: true, sortOrder: 4 },
-    { id: "art_005", name: "Bratwurst mit Brötchen/Brot", price: 4, stock: 500, warningStock: 5, category: "Grill", categoryColor: "#ffb703", active: true, sortOrder: 5 },
-    { id: "art_006", name: "Rindswurst mit Brötchen/Brot", price: 4, stock: 500, warningStock: 5, category: "Grill", categoryColor: "#ffb703", active: true, sortOrder: 6 },
+    { id: "art_005", name: "Bratwurst mit Brötchen/Brot", price: 4, stock: 500, warningStock: 5, category: "Wurst", categoryColor: "#ffb703", active: true, sortOrder: 5 },
+    { id: "art_006", name: "Rindswurst mit Brötchen/Brot", price: 4, stock: 500, warningStock: 5, category: "Wurst", categoryColor: "#ffb703", active: true, sortOrder: 6 },
     { id: "art_007", name: "Pommes", price: 3, stock: 500, warningStock: 10, category: "Beilagen", categoryColor: "#22c55e", active: true, sortOrder: 7 },
     { id: "art_008", name: "Kochkäse mit Brot", price: 4, stock: 500, warningStock: 5, category: "Beilagen", categoryColor: "#22c55e", active: true, sortOrder: 8 },
     { id: "art_009", name: "Pinsa Salami", price: 8.5, stock: 500, warningStock: 5, category: "Pinsa", categoryColor: "#8b5cf6", active: true, sortOrder: 9 },
     { id: "art_010", name: "Pinsa vegetarisch", price: 8.5, stock: 500, warningStock: 5, category: "Pinsa", categoryColor: "#8b5cf6", active: true, sortOrder: 10 },
-    { id: "art_011", name: "Feta Grillpfännchen", price: 6, stock: 500, warningStock: 5, category: "Vegetarisch", categoryColor: "#14b8a6", active: true, sortOrder: 11 },
-    { id: "art_012", name: "Currywurst", price: 4.5, stock: 500, warningStock: 5, category: "Grill", categoryColor: "#ffb703", active: true, sortOrder: 12 },
-    { id: "art_013", name: "Schwedensalat", price: 2, stock: 500, warningStock: 5, category: "Salat", categoryColor: "#0ea5e9", active: true, sortOrder: 13 }
+    { id: "art_011", name: "Feta Grillpfännchen", price: 6, stock: 500, warningStock: 5, category: "Beilagen", categoryColor: "#22c55e", active: true, sortOrder: 11 },
+    { id: "art_012", name: "Currywurst", price: 4.5, stock: 500, warningStock: 5, category: "Wurst", categoryColor: "#ffb703", active: true, sortOrder: 12 },
+    { id: "art_013", name: "Schwedensalat", price: 2, stock: 500, warningStock: 5, category: "Beilagen", categoryColor: "#22c55e", active: true, sortOrder: 13 }
   ],
   orders: [],
   cancellations: [],
@@ -65,6 +66,9 @@ const defaultState = {
     currency: "EUR",
     defaultWarningStock: 5,
     printerName: "Browserdruck",
+    printerMode: "browser",
+    printerPort: "",
+    printOutputDir: "data/prints",
     receiptFooter: "Danke und Gut Schlauch!",
     logoDataUrl: "",
     calculatorName: "name",
@@ -75,11 +79,9 @@ const defaultState = {
     categories: [
       { name: "Schnitzel", color: "#e32626" },
       { name: "Küche", color: "#f97316" },
-      { name: "Grill", color: "#ffb703" },
+      { name: "Wurst", color: "#ffb703" },
       { name: "Beilagen", color: "#22c55e" },
-      { name: "Pinsa", color: "#8b5cf6" },
-      { name: "Vegetarisch", color: "#14b8a6" },
-      { name: "Salat", color: "#0ea5e9" }
+      { name: "Pinsa", color: "#8b5cf6" }
     ]
   }
 };
@@ -87,6 +89,7 @@ const defaultState = {
 async function ensureDataFiles() {
   await fsp.mkdir(eventsDir, { recursive: true });
   await fsp.mkdir(archiveDir, { recursive: true });
+  await fsp.mkdir(printsDir, { recursive: true });
   if (!fs.existsSync(defaultsPath)) {
     await writeJson(defaultsPath, defaultState);
   }
@@ -188,6 +191,88 @@ function safeEventFileName(name) {
   return `${slug}.json`;
 }
 
+function timestampSlug(date = new Date()) {
+  const pad = (value) => String(value).padStart(2, "0");
+  return [
+    date.getFullYear(),
+    pad(date.getMonth() + 1),
+    pad(date.getDate()),
+    pad(date.getHours()),
+    pad(date.getMinutes()),
+    pad(date.getSeconds())
+  ].join("-");
+}
+
+function safeEventVersionFileName(name, date = new Date()) {
+  return safeEventFileName(`${name}-${timestampSlug(date)}`);
+}
+
+function safePrintFileName(prefix = "bon") {
+  const stamp = new Date().toISOString().replace(/[:.]/g, "-");
+  const random = crypto.randomBytes(3).toString("hex");
+  return `${prefix}-${stamp}-${random}.txt`;
+}
+
+function resolvePrintOutputDir(configuredDir) {
+  const rawDir = String(configuredDir || "data/prints").trim() || "data/prints";
+  return path.isAbsolute(rawDir) ? rawDir : path.join(__dirname, rawDir);
+}
+
+function padText(text, width, align = "left") {
+  const value = String(text ?? "");
+  if (value.length >= width) return value.slice(0, width);
+  const spaces = " ".repeat(width - value.length);
+  return align === "right" ? `${spaces}${value}` : `${value}${spaces}`;
+}
+
+function moneyText(value, currency = "EUR") {
+  return new Intl.NumberFormat("de-DE", { style: "currency", currency }).format(Number(value) || 0);
+}
+
+function formatReceiptText(receipt, settings) {
+  const width = 42;
+  const time = receipt.createdAt ? new Date(receipt.createdAt) : new Date();
+  const lines = [
+    settings.eventName || "Festkasse",
+    settings.clubName || "",
+    "-".repeat(width),
+    "",
+    String(receipt.articleName || "Artikel"),
+  ];
+
+  if (!receipt.isFree) {
+    lines.push(moneyText(receipt.price, settings.currency));
+  }
+
+  lines.push(
+    "",
+    "-".repeat(width),
+    time.toLocaleDateString("de-DE"),
+    time.toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" })
+  );
+
+  if (receipt.isFree) {
+    lines.push("Freibon");
+  }
+
+  lines.push("", "");
+  return `${lines.filter((line) => line !== null && line !== undefined).join("\n")}\n`;
+}
+
+async function writeReceiptTextFiles(receipts, settings) {
+  const outputDir = resolvePrintOutputDir(settings.printOutputDir);
+  await fsp.mkdir(outputDir, { recursive: true });
+
+  const files = [];
+  for (const receipt of receipts) {
+    const fileName = safePrintFileName(receipt.isFree ? "freibon" : "bon");
+    const filePath = path.join(outputDir, fileName);
+    await fsp.writeFile(filePath, formatReceiptText(receipt, settings), "utf8");
+    files.push(filePath);
+  }
+  return files;
+}
+
 function resolveManagedFile(fileName) {
   const safeName = path.basename(String(fileName || ""));
   const eventPath = path.join(eventsDir, safeName);
@@ -206,7 +291,8 @@ async function listManagedFiles(dir, type) {
     result.push({
       type,
       file: file.name,
-      eventName: state.settings?.eventName || file.name,
+      eventName: state.settings?.templateName || state.settings?.eventName || file.name,
+      sourceEventName: state.settings?.eventName || file.name,
       clubName: state.settings?.clubName || "",
       orderCount: state.orders?.length || 0,
       dayReportCount: state.dayReports?.length || 0,
@@ -280,7 +366,8 @@ async function handleApi(req, res, urlPath) {
       },
       defaults: {
         file: "defaults.json",
-        eventName: defaultState.settings.eventName,
+        eventName: "Default",
+        sourceEventName: defaultState.settings.eventName,
         clubName: defaultState.settings.clubName
       },
       events,
@@ -292,10 +379,19 @@ async function handleApi(req, res, urlPath) {
   if (req.method === "POST" && urlPath === "/api/events/save") {
     const body = await readBody(req);
     const active = await readJson(activePath);
-    const fileName = safeEventFileName(body.name || active.settings?.eventName);
-    active.settings = { ...(active.settings || {}), activeEventFile: fileName, updatedAt: new Date().toISOString() };
-    await writeJson(path.join(eventsDir, fileName), active);
-    await writeJson(activePath, active);
+    const templateName = String(body.name || active.settings?.eventName || "Vorlage").trim();
+    const savedAt = new Date();
+    const fileName = safeEventVersionFileName(templateName, savedAt);
+    const savedState = {
+      ...active,
+      settings: {
+        ...(active.settings || {}),
+        templateName,
+        activeEventFile: fileName,
+        updatedAt: savedAt.toISOString()
+      }
+    };
+    await writeJson(path.join(eventsDir, fileName), savedState);
     sendJson(res, 200, { file: fileName, state: sanitizeState(active) });
     return;
   }
@@ -340,6 +436,54 @@ async function handleApi(req, res, urlPath) {
     delete user.password;
     await writeJson(activePath, state);
     sendJson(res, 200, { user: sanitizeState({ users: [user] }).users[0] });
+    return;
+  }
+
+  if (req.method === "POST" && urlPath === "/api/print/receipts") {
+    const body = await readBody(req);
+    const state = await readJson(activePath);
+    const settings = { ...(state.settings || {}), ...(body.settings || {}) };
+    const mode = settings.printerMode || "browser";
+
+    if (mode === "textfile") {
+      const files = await writeReceiptTextFiles(body.receipts || [], settings);
+      sendJson(res, 200, { ok: true, mode, files });
+      return;
+    }
+
+    if (mode === "serial") {
+      sendJson(res, 501, { error: "Serieller Druck ist vorbereitet, aber noch nicht aktiviert." });
+      return;
+    }
+
+    sendJson(res, 200, { ok: true, mode: "browser", files: [] });
+    return;
+  }
+
+  if (req.method === "POST" && urlPath === "/api/print/test") {
+    const body = await readBody(req);
+    const state = await readJson(activePath);
+    const settings = { ...(state.settings || {}), ...(body.settings || {}) };
+    const mode = settings.printerMode || "browser";
+    const receipt = {
+      articleName: "Testbon Festkasse",
+      price: 1.23,
+      isFree: false,
+      createdAt: new Date().toISOString()
+    };
+
+    if (mode === "textfile" || mode === "browser") {
+      const files = await writeReceiptTextFiles([receipt], settings);
+      sendJson(res, 200, { ok: true, mode: "textfile", files });
+      return;
+    }
+
+    if (mode === "serial") {
+      sendJson(res, 501, { error: "Serieller Testdruck ist vorbereitet, aber noch nicht aktiviert." });
+      return;
+    }
+
+    sendJson(res, 400, { error: "Unbekannter Druckmodus." });
     return;
   }
 

@@ -1,6 +1,6 @@
 # Festkasse Zellhausen
 
-Webbasierte MVP-Festkasse für Feuerwehrfeste, lokal im Browser oder über einen kleinen Node-Server nutzbar.
+Webbasierte Festkasse für Feuerwehrfeste, optimiert für lokale Nutzung über einen kleinen Node-Server, Kassen-PCs, Tablets und große Touchscreens.
 
 ## Start
 
@@ -15,59 +15,95 @@ Danach im Browser öffnen:
 http://localhost:3000
 ```
 
-Wichtig: Die Kasse sollte über den Node-Server laufen. Nur dann werden Daten zentral in JSON-Dateien gespeichert und können von mehreren Browsern oder Geräten genutzt werden.
+Wichtig: Die Kasse sollte über den Node-Server laufen. Nur dann werden Daten zentral in JSON-Dateien gespeichert und können von mehreren Browsern oder Geräten im gleichen Netzwerk genutzt werden.
 
-## Demo-Logins
+## Standardzugänge
 
 | Rolle | Benutzer | Passwort |
 | --- | --- | --- |
 | User | `kasse` | `kasse123` |
 | Admin | `admin` | `admin123` |
 
-Passwörter werden in den Festdaten nicht im Klartext gespeichert, sondern als Salt + Hash.
+Passwörter werden serverseitig als Salt + Hash gespeichert. Über **Admin > Benutzer & Passwörter** können neue Passwörter gesetzt werden.
+
+## Aktueller Stand
+
+- Rollen: User und Admin
+- Login mit Session-Erhalt beim Browser-Refresh
+- Kassenansicht mit großen Artikelkarten, max. 5 Kategorien und fester Kachelstruktur
+- Warenkorb mit Erhalten/Rückgeld, Positionen erhöhen, reduzieren und löschen
+- Bon drucken für normale Buchungen
+- Freibon buchen für kostenlose Buchungen mit Bestandsreduzierung
+- Minimalistische Meldungen im Kassenmodus: nur Fehler und Warnungen
+- Admin-Tabs für Tagesauswertung, Artikel, Kategorien, Benutzer, Drucken, Daten & Vorlagen und Einstellungen
+- Tagesauswertung mit Normal, Kostenlos und Summe
+- Tageskasse abschließen mit historischem Tagesabschluss
+- Artikel- und Kategorieverwaltung mit Reihenfolge, Farben, Speichern-Feedback und Löschabfragen
+- Einstellungen für Festname, Vereinsname, Logo, Rechner, Telefonnummer und Hinweis
+- Daten & Vorlagen zum Speichern und Laden von Festständen
+- Druckmodi für Browserdruck, TXT-Testdruck und vorbereiteten seriellen Thermodrucker
 
 ## Datenhaltung
 
-Die laufenden Festdaten liegen zentral auf dem Server:
+Die aktive Datenquelle liegt im Ordner `data`:
 
 ```text
-data/defaults.json       Grunddaten und neutrale Vorlage
+data/defaults.json       Grunddaten und Systemvorlage
 data/fest.json           aktuell geladenes/laufendes Fest
-data/events/*.json       gespeicherte Feste und Vorlagen
-data/archive/*.json      Archiv für abgeschlossene Feste
+data/events/*.json       gespeicherte Festvorlagen zur Laufzeit
+data/archive/*.json      optionale Archivdaten zur Laufzeit
+data/prints/*.txt        TXT-Testbons
 ```
 
-`public/app.js` enthält nur noch die Browserlogik und einen Fallback-Datensatz für die Oberfläche. Die aktive Datenquelle ist `data/fest.json`.
+`data/defaults.json`, `data/fest.json` und `data/schema.json` sind Teil des Repos. Laufzeitdateien aus `data/events`, `data/archive` und `data/prints` werden ignoriert, damit Testbons und lokale Vorlagen nicht versehentlich gepusht werden.
 
 ## Admin: Daten & Vorlagen
 
-Unter `Einstellungen` gibt es den Bereich `Daten & Vorlagen`:
+Der Bereich **Daten & Vorlagen** ist ein eigener Admin-Menüpunkt.
 
-- aktuelles Fest sichern
-- neues Fest aus Default starten
-- Default-Daten laden
-- gespeicherte Feste vollständig laden
-- gespeicherte Feste als Vorlage laden
-- fremde/alte Festdateien löschen
+- **Aktuelles Fest speichern** legt eine Vorlage mit Name, Datum und Uhrzeit ab.
+- **Fest laden** lädt eine vorhandene Vorlage als neuen Arbeitsstand.
+- **Default** ist die nicht löschbare Systemvorlage.
+- Lokale gespeicherte Vorlagen können gelöscht werden.
 
-Beim Laden als Vorlage werden Artikel, Kategorien, Benutzer und Einstellungen übernommen. Verkäufe, Stornos und Tagesabschlüsse werden geleert und Artikelbestände auf 500 gesetzt.
+Beim Laden einer Vorlage werden Verkäufe, Stornos und Tagesabschlüsse geleert und Artikelbestände auf den Standardbestand gesetzt.
 
-## MVP-Funktionen
+## Admin: Drucken
 
-- Login mit Rollen
-- Rollen: User und Admin
-- zentrale JSON-Datenhaltung über den Node-Server
-- Kassenansicht mit großen Artikelbuttons
-- dauerhaft sichtbarer Warenkorb
-- Positionen erhöhen, reduzieren und löschen
-- Warenkorb leeren
-- Bon drucken schließt eine normale Buchung ab und erzeugt je Artikel einen 80-mm-Bon
-- Freibon buchen erzeugt ebenfalls Bons, reduziert Bestand und landet separat in der Auswertung
-- Rückgeldrechner
-- Bestand wird beim Bezahlen reduziert
-- Warnung bei knappem Bestand
-- Admin-Auswertung mit getrennten Tabellen für normale Buchungen, kostenlose Buchungen und Gesamtverbrauch
-- Artikel anlegen, bearbeiten, deaktivieren, kategorisieren, einfärben und Bestand korrigieren
-- Kategorien verwalten
-- Festname, Vereinsname, Logo, Rechner, Telefonnummer und Hinweis im Adminbereich ändern
-- Passwörter im Adminbereich neu setzen
+Im Bereich **Drucken** kann der Druckmodus gesetzt werden:
+
+- `Browserdruck`: nutzt den normalen Druckdialog des Browsers.
+- `Textdatei-Testdruck`: schreibt Testbons als TXT-Dateien nach `data/prints`.
+- `Serieller Thermodrucker`: vorbereitet für Ports wie `COM3` oder `/dev/ttyUSB0`.
+
+Der TXT-Testdruck dient als Test- und Übergangsmodus für den späteren Axiom-A794-Thermodrucker. Bons enthalten Festname, Vereinsname, Artikel, Preis sowie Datum und Uhrzeit. Bei Freibons wird kein Preis ausgegeben.
+
+## Raspberry Pi Vorbereitung
+
+Empfohlen:
+
+- Raspberry Pi OS Lite oder Desktop, 64-bit
+- Node.js LTS
+- Zugriff im lokalen Netzwerk
+- USB-RS232-Adapter mit FTDI-Chip für den Thermodrucker
+- Drucker-Port später typischerweise `/dev/ttyUSB0`
+
+Für den normalen Browserbetrieb reicht der Node-Server. Für echten seriellen Thermodruck muss der Drucker vor Ort mit Port, Baudrate und Kabel getestet werden.
+
+## Entwicklung
+
+Die App nutzt bewusst keine Frontend-Frameworks:
+
+```text
+server.js          Node-HTTP-Server, JSON-Daten, Login, Druck-Endpunkte
+public/app.js      Browserlogik und UI-Rendering
+public/styles.css  Designsystem, Layout und Print-CSS
+data/schema.json   Datenmodell-Dokumentation
+```
+
+Vor einem Commit sinnvoll prüfen:
+
+```bash
+node --check server.js
+node --check public/app.js
+```

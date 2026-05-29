@@ -22,7 +22,7 @@
       "price": 3.5,
       "stock": 80,
       "warningStock": 5,
-      "category": "Grill",
+      "category": "Wurst",
       "categoryColor": "#e32626",
       "sortOrder": 1,
       "active": true
@@ -77,6 +77,9 @@
     "currency": "EUR",
     "defaultWarningStock": 5,
     "printerName": "Browserdruck",
+    "printerMode": "browser",
+    "printerPort": "",
+    "printOutputDir": "data/prints",
     "receiptFooter": "Danke und Gut Schlauch!",
     "logoDataUrl": "",
     "calculatorName": "name",
@@ -85,7 +88,7 @@
     "menuVersion": 4,
     "categories": [
       {
-        "name": "Grill",
+        "name": "Wurst",
         "color": "#e32626"
       }
     ]
