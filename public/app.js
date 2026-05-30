@@ -63,11 +63,13 @@ const adminDirtySections = new Set();
 const adminSavedSections = new Set();
 let eventCatalog = null;
 let bootError = "";
+let systemInfo = { platform: "unknown", canShutdown: false };
 
 async function loadState() {
   const response = await fetch("/api/state");
   if (!response.ok) throw new Error("Serverdaten konnten nicht geladen werden.");
   const payload = await response.json();
+  systemInfo = payload.system || systemInfo;
   return normalizeState(payload.state);
 }
 
@@ -793,6 +795,11 @@ function settingsTemplate() {
           <textarea name="calculatorComment" maxlength="400" rows="5">${state.settings.calculatorComment || ""}</textarea>
         </div>
       </form>
+      ${systemInfo.canShutdown ? `
+        <div class="system-actions">
+          <button class="danger-button" data-system-shutdown>Raspberry herunterfahren</button>
+        </div>
+      ` : ""}
     </section>
   `;
 }
@@ -1138,6 +1145,7 @@ function bindAdmin() {
     button.addEventListener("click", () => deleteManagedEvent(button.dataset.deleteEvent));
   });
   document.querySelector("[data-load-default-event]")?.addEventListener("click", loadDefaultEvent);
+  document.querySelector("[data-system-shutdown]")?.addEventListener("click", shutdownSystem);
   if (activeAdminSection === "data") {
     refreshEventCatalog();
   }
@@ -1841,6 +1849,17 @@ async function printReportTextFile(report) {
   if (payload.mode === "textfile" && payload.files?.length) {
     showToast(`Auswertung geschrieben: ${payload.files[0]}`);
   }
+}
+
+async function shutdownSystem() {
+  if (!window.confirm("Raspberry wirklich herunterfahren?")) return;
+  const response = await fetch("/api/system/shutdown", { method: "POST" });
+  if (!response.ok) {
+    const payload = await response.json().catch(() => ({}));
+    showToast(payload.error || "Herunterfahren fehlgeschlagen.");
+    return;
+  }
+  showToast("Raspberry wird heruntergefahren.");
 }
 
 function resetDayCash() {

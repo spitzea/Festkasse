@@ -90,6 +90,101 @@ Empfohlen:
 
 Für den normalen Browserbetrieb reicht der Node-Server. Für echten seriellen Thermodruck muss der Drucker vor Ort mit Port, Baudrate und Kabel getestet werden.
 
+### Raspberry Pi Lite als lokale Kasse
+
+Auf Raspberry Pi OS Lite ist kein Desktop vorinstalliert. Für den lokalen Monitorbetrieb reicht eine kleine X/Openbox/Chromium-Kiosk-Umgebung:
+
+```bash
+sudo apt update
+sudo apt install -y git nodejs npm lsof curl
+sudo apt install -y --no-install-recommends xserver-xorg xinit openbox chromium-browser unclutter
+```
+
+Falls `chromium-browser` nicht verfügbar ist:
+
+```bash
+sudo apt install -y --no-install-recommends chromium
+```
+
+Festkasse als Systemdienst:
+
+```bash
+sudo nano /etc/systemd/system/festkasse.service
+```
+
+```ini
+[Unit]
+Description=Festkasse Node Server
+After=network.target
+
+[Service]
+Type=simple
+User=andreas
+WorkingDirectory=/home/andreas/Festkasse
+ExecStart=/usr/bin/npm start
+Restart=always
+RestartSec=5
+Environment=PORT=3000
+
+[Install]
+WantedBy=multi-user.target
+```
+
+```bash
+sudo systemctl daemon-reload
+sudo systemctl enable festkasse
+sudo systemctl start festkasse
+```
+
+Kiosk-Start für den lokalen Monitor:
+
+```bash
+nano ~/.xinitrc
+```
+
+```bash
+xset s off
+xset -dpms
+xset s noblank
+unclutter -idle 1 &
+openbox-session &
+
+while ! curl -fsS http://localhost:3000 >/dev/null; do
+  sleep 1
+done
+
+CHROMIUM="$(command -v chromium-browser || command -v chromium)"
+exec "$CHROMIUM" --kiosk --noerrdialogs --disable-infobars --disable-session-crashed-bubble http://localhost:3000
+```
+
+Autologin auf der Konsole über `sudo raspi-config` aktivieren:
+
+```text
+System Options -> Boot / Auto Login -> Console Autologin
+```
+
+Danach `startx` automatisch auf der ersten Konsole starten:
+
+```bash
+nano ~/.bash_profile
+```
+
+```bash
+if [ -z "$DISPLAY" ] && [ "$(tty)" = "/dev/tty1" ]; then
+  startx
+fi
+```
+
+Damit der Admin-Button **Raspberry herunterfahren** ohne Passwort funktioniert:
+
+```bash
+sudo visudo -f /etc/sudoers.d/festkasse-shutdown
+```
+
+```text
+andreas ALL=(root) NOPASSWD: /usr/sbin/shutdown
+```
+
 ## Entwicklung
 
 Die App nutzt bewusst keine Frontend-Frameworks:

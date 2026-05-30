@@ -3,6 +3,7 @@ const fs = require("fs");
 const fsp = require("fs/promises");
 const path = require("path");
 const crypto = require("crypto");
+const { execFile } = require("child_process");
 
 const port = process.env.PORT || 3000;
 const publicDir = path.join(__dirname, "public");
@@ -367,10 +368,29 @@ function sendError(res, error) {
   sendJson(res, error.status || 500, { error: error.message || "Serverfehler" });
 }
 
+function systemInfo() {
+  return {
+    platform: process.platform,
+    canShutdown: process.platform === "linux"
+  };
+}
+
+function shutdownSystem() {
+  return new Promise((resolve, reject) => {
+    execFile("sudo", ["shutdown", "-h", "now"], (error) => {
+      if (error) {
+        reject(Object.assign(new Error("Herunterfahren fehlgeschlagen. Bitte sudo-Rechte für shutdown prüfen."), { status: 500 }));
+        return;
+      }
+      resolve();
+    });
+  });
+}
+
 async function handleApi(req, res, urlPath) {
   if (req.method === "GET" && urlPath === "/api/state") {
     const state = await readJson(activePath);
-    sendJson(res, 200, { state: sanitizeState(state) });
+    sendJson(res, 200, { state: sanitizeState(state), system: systemInfo() });
     return;
   }
 
@@ -550,6 +570,16 @@ async function handleApi(req, res, urlPath) {
     }
 
     sendJson(res, 400, { error: "Unbekannter Druckmodus." });
+    return;
+  }
+
+  if (req.method === "POST" && urlPath === "/api/system/shutdown") {
+    if (process.platform !== "linux") {
+      sendJson(res, 400, { error: "Herunterfahren ist nur auf Linux aktiviert." });
+      return;
+    }
+    sendJson(res, 202, { ok: true });
+    shutdownSystem().catch((error) => console.error(error.message));
     return;
   }
 

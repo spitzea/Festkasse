@@ -773,6 +773,12 @@ textarea:focus-visible {
   width: fit-content;
 }
 
+.system-actions {
+  display: flex;
+  justify-content: flex-start;
+  padding: 0 1rem 1rem;
+}
+
 .event-list {
   display: grid;
   gap: var(--space-sm);
