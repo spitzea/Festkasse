@@ -773,10 +773,8 @@ textarea:focus-visible {
   width: fit-content;
 }
 
-.system-actions {
-  display: flex;
-  justify-content: flex-start;
-  padding: 0 1rem 1rem;
+.login-shutdown-button {
+  width: 100%;
 }
 
 .event-list {

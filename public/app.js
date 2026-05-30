@@ -336,6 +336,9 @@ function loginTemplate() {
           </div>
           <div class="error hidden" data-login-error>Login fehlgeschlagen.</div>
         </form>
+        ${systemInfo.canShutdown ? `
+          <button class="danger-button login-shutdown-button" type="button" data-system-shutdown>Raspberry herunterfahren</button>
+        ` : ""}
       </section>
     </main>
   `;
@@ -362,6 +365,7 @@ function shellTemplate() {
             ${adminTab}
           </nav>
           <span class="role-pill user-chip"><span class="avatar-dot">${roleLabel(sessionUser.role).slice(0, 1)}</span>${roleLabel(sessionUser.role)}</span>
+          ${systemInfo.canShutdown ? `<button class="danger-button" data-system-shutdown>Herunterfahren</button>` : ""}
           <button class="ghost-button" data-logout>Logout</button>
         </div>
       </header>
@@ -795,11 +799,6 @@ function settingsTemplate() {
           <textarea name="calculatorComment" maxlength="400" rows="5">${state.settings.calculatorComment || ""}</textarea>
         </div>
       </form>
-      ${systemInfo.canShutdown ? `
-        <div class="system-actions">
-          <button class="danger-button" data-system-shutdown>Raspberry herunterfahren</button>
-        </div>
-      ` : ""}
     </section>
   `;
 }
@@ -1004,6 +1003,7 @@ function articleEditTemplate(article, index) {
 }
 
 function bindLogin() {
+  document.querySelector("[data-system-shutdown]")?.addEventListener("click", shutdownSystem);
   document.querySelector("[data-login-form]").addEventListener("submit", async (event) => {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
@@ -1044,6 +1044,7 @@ function bindShell() {
     paidAmount = "";
     render();
   });
+  document.querySelector("[data-system-shutdown]")?.addEventListener("click", shutdownSystem);
 
   startClock();
 }
@@ -1145,7 +1146,6 @@ function bindAdmin() {
     button.addEventListener("click", () => deleteManagedEvent(button.dataset.deleteEvent));
   });
   document.querySelector("[data-load-default-event]")?.addEventListener("click", loadDefaultEvent);
-  document.querySelector("[data-system-shutdown]")?.addEventListener("click", shutdownSystem);
   if (activeAdminSection === "data") {
     refreshEventCatalog();
   }
