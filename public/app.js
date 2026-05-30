@@ -1799,6 +1799,22 @@ function printArchivedReport(reportId) {
 
 function printReportFromOrders(report) {
   const data = buildReportData(report.orders);
+  const sections = [
+    { title: "1. Normal", rows: data.normalRows, showSum: true, totalCount: data.normalCount, totalSum: data.normalSum },
+    { title: "2. Kostenlos", rows: data.freeRows, showSum: false, totalCount: data.freeCount, totalSum: 0 },
+    { title: "3. Summe", rows: data.consumptionRows, showSum: false, totalCount: data.consumptionCount, totalSum: 0 }
+  ];
+
+  if (state.settings.printerMode === "textfile" || state.settings.printerMode === "serial") {
+    printReportTextFile({
+      title: report.title,
+      createdAt: report.createdAt,
+      eventName: report.eventName,
+      clubName: report.clubName,
+      sections
+    });
+    return;
+  }
 
   renderPrint(`
     <section class="daily-print">
@@ -1806,11 +1822,25 @@ function printReportFromOrders(report) {
       <p>${report.eventName}</p>
       <p>${report.clubName}</p>
       <p>${new Date(report.createdAt).toLocaleString("de-DE")}</p>
-      ${printReportSection("1. Normal", data.normalRows, true, data.normalCount, data.normalSum)}
-      ${printReportSection("2. Kostenlos", data.freeRows, false, data.freeCount, 0)}
-      ${printReportSection("3. Summe", data.consumptionRows, false, data.consumptionCount, 0)}
+      ${sections.map((section) => printReportSection(section.title, section.rows, section.showSum, section.totalCount, section.totalSum)).join("")}
     </section>
   `);
+}
+
+async function printReportTextFile(report) {
+  const response = await fetch("/api/print/report", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ settings: state.settings, report })
+  });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    showToast(payload.error || "Drucken fehlgeschlagen.");
+    return;
+  }
+  if (payload.mode === "textfile" && payload.files?.length) {
+    showToast(`Auswertung geschrieben: ${payload.files[0]}`);
+  }
 }
 
 function resetDayCash() {

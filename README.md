@@ -52,7 +52,7 @@ data/defaults.json       Grunddaten und Systemvorlage
 data/fest.json           aktuell geladenes/laufendes Fest
 data/events/*.json       gespeicherte Festvorlagen zur Laufzeit
 data/archive/*.json      optionale Archivdaten zur Laufzeit
-data/prints/*.txt        TXT-Testbons
+data/prints/*.txt        TXT-Testbons und TXT-Auswertungen
 ```
 
 `data/defaults.json`, `data/fest.json` und `data/schema.json` sind Teil des Repos. Laufzeitdateien aus `data/events`, `data/archive` und `data/prints` werden ignoriert, damit Testbons und lokale Vorlagen nicht versehentlich gepusht werden.
@@ -73,10 +73,10 @@ Beim Laden einer Vorlage werden Verkäufe, Stornos und Tagesabschlüsse geleert 
 Im Bereich **Drucken** kann der Druckmodus gesetzt werden:
 
 - `Browserdruck`: nutzt den normalen Druckdialog des Browsers.
-- `Textdatei-Testdruck`: schreibt Testbons als TXT-Dateien nach `data/prints`.
+- `Textdatei-Testdruck`: schreibt Testbons und Auswertungen als TXT-Dateien nach `data/prints`.
 - `Serieller Thermodrucker`: vorbereitet für Ports wie `COM3` oder `/dev/ttyUSB0`.
 
-Der TXT-Testdruck dient als Test- und Übergangsmodus für den späteren Axiom-A794-Thermodrucker. Bons enthalten Festname, Vereinsname, Artikel, Preis sowie Datum und Uhrzeit. Bei Freibons wird kein Preis ausgegeben.
+Der TXT-Testdruck dient als Test- und Übergangsmodus für den späteren Axiom-A794-Thermodrucker. Bons enthalten Festname, Vereinsname, Artikel, Preis sowie Datum und Uhrzeit. Bei Freibons wird kein Preis ausgegeben. Tagesauswertungen und historische Tagesabschlüsse nutzen dieselbe zentrale Druckeinstellung.
 
 ## Raspberry Pi Vorbereitung
 

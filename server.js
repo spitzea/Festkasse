@@ -259,6 +259,43 @@ function formatReceiptText(receipt, settings) {
   return `${lines.filter((line) => line !== null && line !== undefined).join("\n")}\n`;
 }
 
+function formatReportText(report, settings) {
+  const width = 42;
+  const time = report.createdAt ? new Date(report.createdAt) : new Date();
+  const sections = Array.isArray(report.sections) ? report.sections : [];
+  const lines = [
+    String(report.title || "Tagesauswertung"),
+    String(report.eventName || settings.eventName || "Festkasse"),
+    String(report.clubName || settings.clubName || ""),
+    time.toLocaleString("de-DE"),
+    "-".repeat(width)
+  ];
+
+  for (const section of sections) {
+    lines.push("", String(section.title || "Abschnitt"), "-".repeat(width));
+    const rows = Array.isArray(section.rows) ? section.rows : [];
+    if (!rows.length) {
+      lines.push("Keine Buchungen");
+    } else {
+      for (const row of rows) {
+        const quantity = Number(row.quantity) || 0;
+        const name = String(row.name || "Artikel");
+        const amount = section.showSum ? moneyText(row.sum, settings.currency) : "";
+        const right = section.showSum ? `${quantity} ${amount}` : String(quantity);
+        lines.push(`${padText(name, 26)}${padText(right, 16, "right")}`);
+      }
+    }
+    lines.push("-".repeat(width));
+    lines.push(`${padText("Total Artikel", 26)}${padText(section.totalCount || 0, 16, "right")}`);
+    if (section.showSum) {
+      lines.push(`${padText("Total Summe", 26)}${padText(moneyText(section.totalSum, settings.currency), 16, "right")}`);
+    }
+  }
+
+  lines.push("", "");
+  return `${lines.join("\n")}\n`;
+}
+
 async function writeReceiptTextFiles(receipts, settings) {
   const outputDir = resolvePrintOutputDir(settings.printOutputDir);
   await fsp.mkdir(outputDir, { recursive: true });
@@ -271,6 +308,14 @@ async function writeReceiptTextFiles(receipts, settings) {
     files.push(filePath);
   }
   return files;
+}
+
+async function writeReportTextFile(report, settings) {
+  const outputDir = resolvePrintOutputDir(settings.printOutputDir);
+  await fsp.mkdir(outputDir, { recursive: true });
+  const filePath = path.join(outputDir, safePrintFileName("auswertung"));
+  await fsp.writeFile(filePath, formatReportText(report, settings), "utf8");
+  return filePath;
 }
 
 function resolveManagedFile(fileName) {
@@ -448,6 +493,27 @@ async function handleApi(req, res, urlPath) {
     if (mode === "textfile") {
       const files = await writeReceiptTextFiles(body.receipts || [], settings);
       sendJson(res, 200, { ok: true, mode, files });
+      return;
+    }
+
+    if (mode === "serial") {
+      sendJson(res, 501, { error: "Serieller Druck ist vorbereitet, aber noch nicht aktiviert." });
+      return;
+    }
+
+    sendJson(res, 200, { ok: true, mode: "browser", files: [] });
+    return;
+  }
+
+  if (req.method === "POST" && urlPath === "/api/print/report") {
+    const body = await readBody(req);
+    const state = await readJson(activePath);
+    const settings = { ...(state.settings || {}), ...(body.settings || {}) };
+    const mode = settings.printerMode || "browser";
+
+    if (mode === "textfile") {
+      const file = await writeReportTextFile(body.report || {}, settings);
+      sendJson(res, 200, { ok: true, mode, files: [file] });
       return;
     }
 
