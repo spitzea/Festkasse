@@ -24,7 +24,7 @@ Nach dem Neustart wieder per SSH oder lokal anmelden.
 ```bash
 sudo apt update
 sudo apt install -y git nodejs npm lsof curl
-sudo apt install -y --no-install-recommends xserver-xorg xinit openbox unclutter xbindkeys
+sudo apt install -y --no-install-recommends xserver-xorg xinit openbox unclutter x11-xserver-utils
 ```
 
 Chromium installieren:
@@ -43,7 +43,7 @@ command -v startx
 command -v openbox-session
 command -v chromium
 command -v unclutter
-command -v xbindkeys
+command -v xmodmap
 ```
 
 ## Festkasse holen
@@ -110,21 +110,7 @@ curl http://localhost:3000
 
 ## Kiosk-Start
 
-Chromium-Reload-Tasten wie F5 und Ctrl+R vor dem Browser abfangen, weil sie im Kiosk-Modus auf manchen Raspberry-Pi/Chromium-Kombinationen zu einem schwarzen Bildschirm führen können:
-
-```bash
-nano ~/.xbindkeysrc
-```
-
-Inhalt:
-
-```text
-"true"
-  F5
-
-"true"
-  Control+r
-```
+Chromium-Reload-Tasten wie F5 können im Kiosk-Modus auf manchen Raspberry-Pi/Chromium-Kombinationen zu einem schwarzen Bildschirm führen. F5 wird deshalb in der X-Sitzung deaktiviert.
 
 ```bash
 nano ~/.xinitrc
@@ -136,8 +122,8 @@ Inhalt:
 xset s off
 xset -dpms
 xset s noblank
+xmodmap -e "keycode 71 ="
 unclutter -idle 1 &
-xbindkeys &
 openbox-session &
 
 while ! curl -fsS http://localhost:3000 >/dev/null; do
