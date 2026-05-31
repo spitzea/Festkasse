@@ -213,6 +213,13 @@ function systemVersionLabel() {
   return `${version} (${commit})`;
 }
 
+function browserDisplayInfo() {
+  const viewport = `${window.innerWidth} x ${window.innerHeight}`;
+  const screenSize = window.screen ? `${window.screen.width} x ${window.screen.height}` : "unknown";
+  const pixelRatio = Number(window.devicePixelRatio || 1).toFixed(2);
+  return { viewport, screenSize, pixelRatio };
+}
+
 function uid(prefix) {
   return `${prefix}_${Date.now()}_${Math.random().toString(16).slice(2, 8)}`;
 }
@@ -859,6 +866,7 @@ function userAccessTemplate() {
 }
 
 function infoTemplate() {
+  const display = browserDisplayInfo();
   return `
     <section class="panel">
       <div class="panel-header">
@@ -873,6 +881,9 @@ function infoTemplate() {
         <article class="info-card"><span>System</span><strong>${systemInfo.platform || "unknown"}</strong></article>
         <article class="info-card"><span>Angemeldet</span><strong>${sessionUser?.username || "-"}</strong></article>
         <article class="info-card"><span>Rolle</span><strong>${sessionUser ? roleLabel(sessionUser.role) : "-"}</strong></article>
+        <article class="info-card"><span>Browser-Viewport</span><strong>${display.viewport}</strong></article>
+        <article class="info-card"><span>Bildschirm</span><strong>${display.screenSize}</strong></article>
+        <article class="info-card"><span>Pixelverhältnis</span><strong>${display.pixelRatio}</strong></article>
       </div>
     </section>
   `;
