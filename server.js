@@ -632,6 +632,15 @@ const server = http.createServer(async (req, res) => {
   }
 });
 
+server.on("error", (error) => {
+  if (error.code === "EADDRINUSE") {
+    console.error(`Port ${port} ist bereits belegt. Läuft Festkasse schon?`);
+    console.error(`Browser-Adresse: http://localhost:${port}`);
+    process.exit(1);
+  }
+  throw error;
+});
+
 ensureDataFiles().then(() => {
   server.listen(port, () => {
     console.log(`Festkasse Zellhausen läuft auf http://localhost:${port}`);
