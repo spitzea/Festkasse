@@ -24,7 +24,7 @@ Nach dem Neustart wieder per SSH oder lokal anmelden.
 ```bash
 sudo apt update
 sudo apt install -y git nodejs npm lsof curl
-sudo apt install -y --no-install-recommends xserver-xorg xinit openbox unclutter x11-xserver-utils numlockx
+sudo apt install -y --no-install-recommends xserver-xorg xinit openbox unclutter x11-xserver-utils numlockx python3-xdg
 ```
 
 Chromium installieren:
@@ -45,6 +45,7 @@ command -v chromium
 command -v unclutter
 command -v xmodmap
 command -v numlockx
+python3 -c "import xdg; print('pyxdg OK')"
 ```
 
 ## Festkasse holen
@@ -132,7 +133,19 @@ while ! curl -fsS http://localhost:3000 >/dev/null; do
   sleep 1
 done
 
-exec chromium --kiosk --noerrdialogs --disable-infobars --disable-session-crashed-bubble http://localhost:3000
+while true; do
+  chromium \
+    --kiosk \
+    --noerrdialogs \
+    --disable-infobars \
+    --disable-session-crashed-bubble \
+    --no-first-run \
+    --disable-translate \
+    --disable-gpu \
+    --disable-gpu-compositing \
+    http://localhost:3000
+  sleep 1
+done
 ```
 
 Manuell testen:
@@ -179,9 +192,16 @@ Inhalt:
 
 ```bash
 if [ -z "$DISPLAY" ] && [ "$(tty)" = "/dev/tty1" ]; then
-  startx
+  while true; do
+    startx
+    sleep 2
+  done
 fi
 ```
+
+Damit startet Chromium neu, wenn nur der Browser beendet wurde. Wenn die ganze X-Sitzung beendet wurde, startet `startx` nach kurzer Pause wieder. Das erschwert das Ausbrechen aus dem Kiosk-Betrieb deutlich; der vorgesehene Weg zum Beenden bleibt der Shutdown-Button in der Festkasse.
+
+Hinweis: Mit physischem Zugriff auf Tastatur, SD-Karte/SSD oder SSH lässt sich ein Linux-System nie absolut abschließen. Für den Festbetrieb sollte der Kiosk-Benutzer keine unnötigen sudo-Rechte bekommen. Passwortloses sudo sollte nur für `/usr/sbin/shutdown` gesetzt werden.
 
 ## Shutdown aus der App
 
