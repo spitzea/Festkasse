@@ -39,7 +39,7 @@ Wenn das Repo noch nicht geklont ist:
 
 ```powershell
 cd $HOME\Documents
-git clone git@github.com:spitzea/Festkasse.git
+git clone <repository-url>
 cd Festkasse
 npm install
 ```

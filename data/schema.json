@@ -1,28 +1,22 @@
 {
   "users": [
     {
-      "id": "usr_001",
+      "id": "usr_kasse",
       "username": "kasse",
-      "password": "kasse123",
       "role": "user",
-      "active": true
-    },
-    {
-      "id": "usr_002",
-      "username": "admin",
-      "password": "admin123",
-      "role": "admin",
-      "active": true
+      "active": true,
+      "passwordSalt": "example-salt",
+      "passwordHash": "example-password-hash"
     }
   ],
   "articles": [
     {
       "id": "art_001",
-      "name": "Bratwurst mit Brötchen/Brot",
+      "name": "Bratwurst mit Broetchen",
       "price": 3.5,
       "stock": 80,
       "warningStock": 5,
-      "category": "Wurst",
+      "category": "Speisen",
       "categoryColor": "#e32626",
       "sortOrder": 1,
       "active": true
@@ -31,8 +25,8 @@
   "orders": [
     {
       "id": "ord_001",
-      "createdAt": "2026-05-28T12:00:00.000Z",
-      "cashierId": "usr_001",
+      "createdAt": "2026-01-01T12:00:00.000Z",
+      "cashierId": "usr_kasse",
       "status": "paid",
       "paidAmount": 10,
       "changeAmount": 3,
@@ -41,7 +35,7 @@
         {
           "id": "itm_001",
           "articleId": "art_001",
-          "name": "Bratwurst mit Brötchen/Brot",
+          "name": "Bratwurst mit Broetchen",
           "quantity": 2,
           "unitPrice": 3.5,
           "lineTotal": 7,
@@ -53,8 +47,8 @@
   "cancellations": [
     {
       "id": "can_001",
-      "createdAt": "2026-05-28T12:05:00.000Z",
-      "cashierId": "usr_001",
+      "createdAt": "2026-01-01T12:05:00.000Z",
+      "cashierId": "usr_kasse",
       "reason": "Warenkorb geleert",
       "items": []
     }
@@ -62,9 +56,9 @@
   "dayReports": [
     {
       "id": "day_001",
-      "createdAt": "2026-05-28T20:00:00.000Z",
-      "eventName": "Feuerwehrfest",
-      "clubName": "Freiwillige Feuerwehr Zellhausen",
+      "createdAt": "2026-01-01T20:00:00.000Z",
+      "eventName": "Sommerfest",
+      "clubName": "Musterverein e.V.",
       "logoDataUrl": "",
       "total": 7,
       "orderCount": 1,
@@ -72,23 +66,24 @@
     }
   ],
   "settings": {
-    "clubName": "Freiwillige Feuerwehr Zellhausen",
-    "eventName": "Feuerwehrfest",
+    "clubName": "Musterverein e.V.",
+    "eventName": "Sommerfest",
     "currency": "EUR",
     "defaultWarningStock": 5,
     "printerName": "Browserdruck",
     "printerMode": "browser",
     "printerPort": "",
     "printOutputDir": "data/prints",
-    "receiptFooter": "Danke und Gut Schlauch!",
+    "receiptFooter": "Vielen Dank!",
     "logoDataUrl": "",
-    "calculatorName": "name",
-    "calculatorPhone": "123123/123123",
+    "calculatorName": "Kassenleitung",
+    "calculatorPhone": "",
     "calculatorComment": "",
-    "menuVersion": 4,
+    "menuVersion": 5,
+    "activeEventFile": "fest.json",
     "categories": [
       {
-        "name": "Wurst",
+        "name": "Speisen",
         "color": "#e32626"
       }
     ]

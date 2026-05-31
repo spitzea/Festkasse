@@ -1,3 +1,6 @@
+// Festkasse Community Edition
+// Zielgruppe: Feuerwehren, Vereine und ehrenamtliche Organisationen.
+
 const DEFAULT_RESET_STOCK = 500;
 const MAX_CATEGORIES = 5;
 const SESSION_STORAGE_KEY = "festkasseSessionUser";
@@ -26,18 +29,18 @@ const seedData = {
   cancellations: [],
   dayReports: [],
   settings: {
-    clubName: "Freiwillige Feuerwehr Zellhausen",
-    eventName: "Feuerwehrfest",
+    clubName: "Musterverein e.V.",
+    eventName: "Sommerfest",
     currency: "EUR",
     defaultWarningStock: 5,
     printerName: "Browserdruck",
     printerMode: "browser",
     printerPort: "",
     printOutputDir: "data/prints",
-    receiptFooter: "Danke und Gut Schlauch!",
+    receiptFooter: "Vielen Dank!",
     logoDataUrl: "",
-    calculatorName: "name",
-    calculatorPhone: "123123/123123",
+    calculatorName: "Kassenleitung",
+    calculatorPhone: "",
     calculatorComment: "",
     menuVersion: 5,
     activeEventFile: "fest.json",
@@ -1538,7 +1541,7 @@ async function saveSettings(section = "settings", button = getAdminSaveButton(se
   }
   const form = new FormData(formElement);
     if (form.has("eventName")) state.settings.eventName = String(form.get("eventName")).trim() || "Feuerwehrfest";
-    if (form.has("clubName")) state.settings.clubName = String(form.get("clubName")).trim() || "Freiwillige Feuerwehr Zellhausen";
+    if (form.has("clubName")) state.settings.clubName = String(form.get("clubName")).trim() || "Musterverein e.V.";
     if (form.has("calculatorName")) state.settings.calculatorName = String(form.get("calculatorName")).trim();
     if (form.has("calculatorPhone")) state.settings.calculatorPhone = String(form.get("calculatorPhone")).trim();
     if (form.has("calculatorComment")) state.settings.calculatorComment = String(form.get("calculatorComment")).trim().slice(0, 400);

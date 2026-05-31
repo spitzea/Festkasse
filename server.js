@@ -1,3 +1,6 @@
+// Festkasse Community Edition
+// Zielgruppe: Feuerwehren, Vereine und ehrenamtliche Organisationen.
+
 const http = require("http");
 const fs = require("fs");
 const fsp = require("fs/promises");
@@ -63,18 +66,18 @@ const defaultState = {
   cancellations: [],
   dayReports: [],
   settings: {
-    clubName: "Freiwillige Feuerwehr Zellhausen",
-    eventName: "Feuerwehrfest",
+    clubName: "Musterverein e.V.",
+    eventName: "Sommerfest",
     currency: "EUR",
     defaultWarningStock: 5,
     printerName: "Browserdruck",
     printerMode: "browser",
     printerPort: "",
     printOutputDir: "data/prints",
-    receiptFooter: "Danke und Gut Schlauch!",
+    receiptFooter: "Vielen Dank!",
     logoDataUrl: "",
-    calculatorName: "name",
-    calculatorPhone: "123123/123123",
+    calculatorName: "Kassenleitung",
+    calculatorPhone: "",
     calculatorComment: "",
     menuVersion: 5,
     activeEventFile: "fest.json",
@@ -666,7 +669,7 @@ server.on("error", (error) => {
 
 ensureDataFiles().then(() => {
   server.listen(port, () => {
-    console.log(`Festkasse Zellhausen läuft auf http://localhost:${port}`);
+    console.log(`Festkasse Community Edition läuft auf http://localhost:${port}`);
   });
 }).catch((error) => {
   console.error("Dateninitialisierung fehlgeschlagen:", error);

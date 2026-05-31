@@ -1,4 +1,16 @@
 node_modules/
+.env
+*.env
+config.local.*
+logs/
+backups/
+*.sqlite
+*.sqlite3
+*.db
+*.tmp
+*.temp
+tmp/
+temp/
 data/archive/*.json
 data/events/*.json
 data/prints/*.txt

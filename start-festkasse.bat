@@ -20,7 +20,7 @@ if not exist "%NODE_EXE%" if not "%NODE_EXE%"=="node" (
   exit /b 1
 )
 
-echo Starte Festkasse Zellhausen...
+echo Starte Festkasse Community Edition...
 echo.
 echo Browser-Adresse:
 echo http://localhost:3000

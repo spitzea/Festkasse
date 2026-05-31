@@ -54,7 +54,7 @@ Wenn das Repo noch nicht geklont ist:
 
 ```bash
 cd ~
-git clone git@github.com:spitzea/Festkasse.git
+git clone <repository-url>
 cd Festkasse
 npm install
 ```
