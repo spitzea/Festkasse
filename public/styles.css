@@ -1276,6 +1276,12 @@ textarea:focus-visible {
     font-size: 15px;
   }
 
+  .layout {
+    grid-template-columns: minmax(0, 1fr) minmax(18rem, 22rem);
+    gap: 0.65rem;
+    padding: 0.65rem;
+  }
+
   .topbar .brand-mark {
     width: 3.1rem;
     height: 3.1rem;
@@ -1298,21 +1304,22 @@ textarea:focus-visible {
   }
 
   .article-grid {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    grid-auto-rows: 6.25rem;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    grid-auto-rows: 5.9rem;
+    gap: 0.55rem;
   }
 
   .article-button {
-    min-height: 6.25rem;
-    padding: 0.62rem 0.7rem;
+    min-height: 5.9rem;
+    padding: 0.58rem 0.64rem;
   }
 
   .article-name {
-    font-size: 0.9rem;
+    font-size: 0.86rem;
   }
 
   .article-meta {
-    font-size: 0.8rem;
+    font-size: 0.76rem;
   }
 
   .cart .panel-header {
@@ -1320,7 +1327,7 @@ textarea:focus-visible {
   }
 
   .contact-box {
-    font-size: 0.9rem;
+    font-size: 0.86rem;
   }
 }
 
