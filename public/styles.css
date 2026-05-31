@@ -208,6 +208,10 @@ textarea:focus-visible {
   width: 100%;
 }
 
+.menu-logout-button {
+  color: #f7e4b2;
+}
+
 .system-menu-info,
 .info-card {
   display: grid;

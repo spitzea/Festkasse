@@ -209,6 +209,7 @@ function roleLabel(role) {
 function systemVersionLabel() {
   const version = systemInfo.appVersion || "unknown";
   const commit = systemInfo.gitCommit || "unknown";
+  if (version === "unknown" && commit === "unknown") return "nicht verfügbar";
   return `${version} (${commit})`;
 }
 
@@ -377,14 +378,18 @@ function shellTemplate() {
             <div class="system-menu-panel hidden" data-system-menu-panel>
               <div class="system-menu-info">
                 <span>Angemeldet</span>
-                <strong>${roleLabel(sessionUser.role)} · ${sessionUser.username}</strong>
+                <strong>${sessionUser.username}</strong>
+              </div>
+              <div class="system-menu-info">
+                <span>Rolle</span>
+                <strong>${roleLabel(sessionUser.role)}</strong>
               </div>
               <div class="system-menu-info">
                 <span>Version</span>
                 <strong>${systemVersionLabel()}</strong>
               </div>
               ${systemInfo.canShutdown ? `<button class="danger-button small-button" type="button" data-system-shutdown>Herunterfahren</button>` : ""}
-              <button class="ghost-button small-button" type="button" data-logout>Logout</button>
+              <button class="action-button small-button menu-logout-button" type="button" data-logout>Logout</button>
             </div>
           </div>
         </div>
@@ -866,7 +871,8 @@ function infoTemplate() {
         <article class="info-card"><span>Programmversion</span><strong>${systemInfo.appVersion || "unknown"}</strong></article>
         <article class="info-card"><span>Git-Version</span><strong>${systemInfo.gitCommit || "unknown"}</strong></article>
         <article class="info-card"><span>System</span><strong>${systemInfo.platform || "unknown"}</strong></article>
-        <article class="info-card"><span>Angemeldet</span><strong>${sessionUser ? `${roleLabel(sessionUser.role)} · ${sessionUser.username}` : "-"}</strong></article>
+        <article class="info-card"><span>Angemeldet</span><strong>${sessionUser?.username || "-"}</strong></article>
+        <article class="info-card"><span>Rolle</span><strong>${sessionUser ? roleLabel(sessionUser.role) : "-"}</strong></article>
       </div>
     </section>
   `;
