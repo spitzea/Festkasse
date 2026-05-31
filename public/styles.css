@@ -543,16 +543,25 @@ textarea:focus-visible {
   border-bottom: 1px solid var(--line);
 }
 
+.cart-item-info {
+  min-width: 0;
+}
+
 .cart-row strong {
   display: block;
   font-size: 1rem;
   line-height: 1.25;
-  overflow-wrap: anywhere;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .cart-row span {
+  display: block;
   color: var(--muted);
   font-size: 0.94rem;
+  line-height: 1.2;
+  white-space: nowrap;
 }
 
 .cart-controls {
@@ -1106,6 +1115,7 @@ textarea:focus-visible {
 .report-table {
   width: 100%;
   border-collapse: collapse;
+  table-layout: fixed;
   min-width: 15rem;
 }
 
@@ -1121,6 +1131,8 @@ textarea:focus-visible {
 .report-table th:nth-child(3),
 .report-table td:nth-child(3) {
   text-align: right;
+  width: 4.5rem;
+  white-space: nowrap;
 }
 
 .report-table th {
@@ -1326,8 +1338,72 @@ textarea:focus-visible {
     padding: 0.65rem 0.75rem;
   }
 
+  .cart-body {
+    padding: 0.75rem;
+  }
+
+  .cart-row {
+    gap: 0.45rem;
+    padding: 0.46rem 0;
+  }
+
+  .cart-row strong {
+    font-size: 0.88rem;
+    line-height: 1.12;
+  }
+
+  .cart-row span {
+    font-size: 0.8rem;
+  }
+
+  .cart-controls {
+    gap: 0.28rem;
+  }
+
+  .cart-controls .qty-button {
+    width: 2.1rem;
+    height: 2.1rem;
+    font-size: 1.08rem;
+  }
+
+  .cart-total {
+    padding-top: 0.55rem;
+    font-size: 0.95rem;
+  }
+
+  .cart-total output {
+    font-size: 1.5rem;
+  }
+
   .contact-box {
     font-size: 0.86rem;
+  }
+
+  .report-grid {
+    grid-template-columns: minmax(24rem, 1.35fr) repeat(2, minmax(14rem, 1fr));
+    gap: 0.7rem;
+    padding: 0.8rem;
+  }
+
+  .report-card {
+    padding: 0.75rem;
+  }
+
+  .report-table {
+    font-size: 0.85rem;
+  }
+
+  .report-table th,
+  .report-table td {
+    padding: 0.3rem 0.35rem;
+    line-height: 1.15;
+  }
+
+  .report-table th:nth-child(2),
+  .report-table td:nth-child(2),
+  .report-table th:nth-child(3),
+  .report-table td:nth-child(3) {
+    width: 3.8rem;
   }
 }
 

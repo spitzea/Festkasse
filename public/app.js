@@ -531,7 +531,7 @@ function cartTemplate() {
 function cartRowTemplate(item) {
   return `
     <div class="cart-row">
-      <div>
+      <div class="cart-item-info">
         <strong>${item.name}</strong>
         <span>${item.quantity} x ${money(item.unitPrice)} = ${money(item.quantity * item.unitPrice)}</span>
       </div>
