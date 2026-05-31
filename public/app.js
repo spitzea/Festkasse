@@ -350,7 +350,7 @@ function loginTemplate() {
           </div>
           <div class="error hidden" data-login-error>Login fehlgeschlagen.</div>
         </form>
-        <button class="ghost-button small-button login-shutdown-button" type="button" data-system-shutdown>Raspberry herunterfahren</button>
+        ${canShutdownSystem() ? `<button class="ghost-button small-button login-shutdown-button" type="button" data-system-shutdown>Herunterfahren</button>` : ""}
       </section>
     </main>
   `;
@@ -378,7 +378,7 @@ function shellTemplate() {
                 <button class="tab-button ${activeView === "admin" && activeAdminSection === "info" ? "active" : ""}" type="button" data-admin-section="info">Info</button>
                 ${canManage() ? adminMenuTemplate() : ""}
               </nav>
-              <button class="danger-button small-button" type="button" data-system-shutdown>Herunterfahren</button>
+              ${canShutdownSystem() ? `<button class="danger-button small-button" type="button" data-system-shutdown>Herunterfahren</button>` : ""}
               <button class="action-button small-button menu-logout-button" type="button" data-logout>Logout</button>
             </div>
           </div>
@@ -388,6 +388,10 @@ function shellTemplate() {
       <div class="toast hidden" data-toast></div>
     </main>
   `;
+}
+
+function canShutdownSystem() {
+  return Boolean(systemInfo.canShutdown);
 }
 
 function adminMenuTemplate() {
