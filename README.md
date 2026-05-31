@@ -17,6 +17,11 @@ http://localhost:3000
 
 Wichtig: Die Kasse sollte über den Node-Server laufen. Nur dann werden Daten zentral in JSON-Dateien gespeichert und können von mehreren Browsern oder Geräten im gleichen Netzwerk genutzt werden.
 
+## Installation
+
+- Windows: siehe [Windows Setup](docs/windows-setup.md)
+- Raspberry Pi OS Lite als lokale Kasse mit Monitor, Tastatur, Maus, Chromium-Kiosk, Autologin und Shutdown-Button: siehe [Raspberry Pi Kiosk Setup](docs/raspberry-pi-kiosk.md)
+
 ## Standardzugänge
 
 | Rolle | Benutzer | Passwort |
@@ -90,7 +95,7 @@ Empfohlen:
 
 Für den normalen Browserbetrieb reicht der Node-Server. Für echten seriellen Thermodruck muss der Drucker vor Ort mit Port, Baudrate und Kabel getestet werden.
 
-Für Raspberry Pi OS Lite als lokale Kasse mit Monitor, Tastatur, Maus, Chromium-Kiosk, Autologin und Shutdown-Button siehe [Raspberry Pi Kiosk Setup](docs/raspberry-pi-kiosk.md).
+Für den Kiosk-Betrieb siehe [Raspberry Pi Kiosk Setup](docs/raspberry-pi-kiosk.md).
 
 ## Entwicklung
 

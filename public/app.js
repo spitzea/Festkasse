@@ -469,7 +469,7 @@ function articleButtonTemplate(article) {
       <span class="article-name">${article.name}</span>
       <span class="article-meta">
         <span>${money(article.price)}</span>
-        <span>${out ? "Ausverkauft" : `${article.stock} Stk.`}</span>
+        <span data-article-stock>${out ? "Ausverkauft" : `${article.stock} Stk.`}</span>
       </span>
       ${low ? `<span class="article-meta"><span>Knapp!</span><span>Warnung bei ${article.warningStock}</span></span>` : ""}
     </button>
@@ -1201,8 +1201,12 @@ function updateArticleButtonState(articleId) {
 
   const reserved = cart.find((item) => item.articleId === articleId)?.quantity || 0;
   const out = article.stock <= 0 || reserved >= article.stock;
+  const stockElement = button.querySelector("[data-article-stock]");
   button.disabled = out;
   button.classList.toggle("out", out);
+  if (stockElement) {
+    stockElement.textContent = article.stock <= 0 ? "Ausverkauft" : `${article.stock} Stk.`;
+  }
 }
 
 function updateChangeOutput() {
@@ -1787,6 +1791,8 @@ async function checkout(isFree) {
   }
 
   // Der Bestand wird erst nach der finalen Prüfung reduziert, damit halbe Buchungen vermieden werden.
+  const changedArticleIds = cart.map((item) => item.articleId);
+
   cart.forEach((item) => {
     const article = state.articles.find((candidate) => candidate.id === item.articleId);
     article.stock -= item.quantity;
@@ -1807,7 +1813,8 @@ async function checkout(isFree) {
   cart = [];
   paidAmount = "";
   showToast(isFree ? "Kostenlos gebucht." : "Bezahlt und gespeichert.");
-  renderCashier();
+  renderCart();
+  changedArticleIds.forEach(updateArticleButtonState);
 }
 
 async function printReceipt(items, total, isFree) {
