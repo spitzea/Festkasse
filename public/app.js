@@ -484,7 +484,7 @@ function cartTemplate() {
     : `<div class="empty-state">Noch nichts im Korb. Gleich wird's heiß.</div>`;
 
   return `
-    <aside class="panel cart">
+    <aside class="panel cart" data-cart-panel>
       <div class="panel-header">
         <div>
           <h2>Warenkorb</h2>
@@ -1145,6 +1145,10 @@ function bindCashier() {
     button.addEventListener("click", () => addToCart(button.dataset.addArticle));
   });
 
+  bindCart();
+}
+
+function bindCart() {
   document.querySelectorAll("[data-inc]").forEach((button) => {
     button.addEventListener("click", () => addToCart(button.dataset.inc));
   });
@@ -1156,7 +1160,8 @@ function bindCashier() {
   document.querySelectorAll("[data-remove]").forEach((button) => {
     button.addEventListener("click", () => {
       cart = cart.filter((item) => item.articleId !== button.dataset.remove);
-      renderCashier();
+      renderCart();
+      updateArticleButtonState(button.dataset.remove);
     });
   });
 
@@ -1176,6 +1181,28 @@ function bindCashier() {
   paidInput.addEventListener("blur", (event) => {
     event.target.value = moneyInput(paidAmount);
   });
+}
+
+function renderCart() {
+  const cartPanel = document.querySelector("[data-cart-panel]");
+  if (!cartPanel) {
+    renderCashier();
+    return;
+  }
+
+  cartPanel.outerHTML = cartTemplate();
+  bindCart();
+}
+
+function updateArticleButtonState(articleId) {
+  const article = state.articles.find((item) => item.id === articleId);
+  const button = document.querySelector(`[data-add-article="${articleId}"]`);
+  if (!article || !button) return;
+
+  const reserved = cart.find((item) => item.articleId === articleId)?.quantity || 0;
+  const out = article.stock <= 0 || reserved >= article.stock;
+  button.disabled = out;
+  button.classList.toggle("out", out);
 }
 
 function updateChangeOutput() {
@@ -1694,7 +1721,8 @@ function addToCart(articleId) {
     });
   }
 
-  renderCashier();
+  renderCart();
+  updateArticleButtonState(articleId);
 }
 
 function decrementCart(articleId) {
@@ -1706,7 +1734,8 @@ function decrementCart(articleId) {
     cart = cart.filter((cartItem) => cartItem.articleId !== articleId);
   }
 
-  renderCashier();
+  renderCart();
+  updateArticleButtonState(articleId);
 }
 
 function cancelCart() {
@@ -1723,7 +1752,8 @@ function cancelCart() {
   cart = [];
   paidAmount = "";
   showToast("Warenkorb geleert.");
-  renderCashier();
+  renderCart();
+  state.articles.forEach((article) => updateArticleButtonState(article.id));
 }
 
 async function checkout(isFree) {

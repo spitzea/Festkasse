@@ -24,7 +24,7 @@ Nach dem Neustart wieder per SSH oder lokal anmelden.
 ```bash
 sudo apt update
 sudo apt install -y git nodejs npm lsof curl
-sudo apt install -y --no-install-recommends xserver-xorg xinit openbox unclutter x11-xserver-utils
+sudo apt install -y --no-install-recommends xserver-xorg xinit openbox unclutter x11-xserver-utils numlockx
 ```
 
 Chromium installieren:
@@ -44,6 +44,7 @@ command -v openbox-session
 command -v chromium
 command -v unclutter
 command -v xmodmap
+command -v numlockx
 ```
 
 ## Festkasse holen
@@ -110,7 +111,7 @@ curl http://localhost:3000
 
 ## Kiosk-Start
 
-Chromium-Reload-Tasten wie F5 können im Kiosk-Modus auf manchen Raspberry-Pi/Chromium-Kombinationen zu einem schwarzen Bildschirm führen. F5 wird deshalb in der X-Sitzung deaktiviert.
+Chromium-Reload-Tasten wie F5 können im Kiosk-Modus auf manchen Raspberry-Pi/Chromium-Kombinationen zu einem schwarzen Bildschirm führen. F5 wird deshalb in der X-Sitzung deaktiviert. Für den Nummernblock wird NumLock beim Start aktiviert.
 
 ```bash
 nano ~/.xinitrc
@@ -123,6 +124,7 @@ xset s off
 xset -dpms
 xset s noblank
 xmodmap -e "keycode 71 ="
+numlockx on
 unclutter -idle 1 &
 openbox-session &
 
