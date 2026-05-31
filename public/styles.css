@@ -140,12 +140,11 @@ textarea:focus-visible {
 .top-actions {
   display: flex;
   align-items: center;
-  gap: 0.65rem;
-  flex-wrap: nowrap;
+  gap: 0.5rem;
+  flex-wrap: wrap;
   justify-content: flex-end;
   min-width: 0;
-  overflow-x: auto;
-  padding-bottom: 0.15rem;
+  overflow: visible;
 }
 
 .role-pill,
@@ -166,14 +165,20 @@ textarea:focus-visible {
 
 .system-menu {
   position: relative;
+  flex: 0 0 auto;
 }
 
 .menu-button {
-  display: inline-grid;
-  place-items: center;
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
   gap: 0.18rem;
-  width: 2.65rem;
-  padding-inline: 0.65rem;
+  width: 2.55rem;
+  min-width: 2.55rem;
+  min-height: 2.55rem;
+  padding: 0;
+  border: 1px solid var(--line);
 }
 
 .menu-button span {
@@ -197,6 +202,10 @@ textarea:focus-visible {
   border-radius: var(--radius-md);
   background: var(--panel);
   box-shadow: var(--shadow-md);
+}
+
+.system-menu-panel .small-button {
+  width: 100%;
 }
 
 .system-menu-info,
@@ -231,10 +240,9 @@ textarea:focus-visible {
 .view-tabs {
   display: flex;
   gap: 0.4rem;
-  flex-wrap: nowrap;
+  flex-wrap: wrap;
   min-width: 0;
-  overflow-x: auto;
-  padding-bottom: 0.15rem;
+  overflow: visible;
 }
 
 .admin-layout .view-tabs {
