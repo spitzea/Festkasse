@@ -238,20 +238,6 @@ textarea:focus-visible {
   color: #f7e4b2;
 }
 
-.system-menu-info {
-  display: grid;
-  gap: 0.2rem;
-}
-
-.system-menu-info span {
-  color: var(--muted);
-  font-size: 0.8rem;
-}
-
-.system-menu-info strong {
-  overflow-wrap: anywhere;
-}
-
 .avatar-dot {
   display: grid;
   place-items: center;

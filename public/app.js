@@ -308,7 +308,7 @@ function render() {
   app.innerHTML = shellTemplate();
   bindShell();
 
-  if (activeView === "admin" && canManage()) {
+  if (activeView === "admin" && (canManage() || activeAdminSection === "info")) {
     renderAdmin();
   } else {
     activeView = "cashier";
@@ -370,28 +370,16 @@ function shellTemplate() {
           </div>
         </div>
         <div class="top-actions">
+          <button class="tab-button ${activeView === "cashier" ? "active" : ""}" type="button" data-view="cashier">Kasse</button>
           <div class="system-menu">
             <button class="ghost-button menu-button" type="button" data-system-menu aria-label="Menü" aria-expanded="false">
               <span></span><span></span><span></span>
             </button>
             <div class="system-menu-panel hidden" data-system-menu-panel>
               <nav class="menu-nav">
-                <button class="tab-button ${activeView === "cashier" ? "active" : ""}" type="button" data-view="cashier">Kasse</button>
-                ${canManage() ? `<button class="tab-button ${activeView === "admin" ? "active" : ""}" type="button" data-view="admin">Admin</button>` : ""}
+                <button class="tab-button ${activeView === "admin" && activeAdminSection === "info" ? "active" : ""}" type="button" data-admin-section="info">Info</button>
                 ${canManage() ? adminMenuTemplate() : ""}
               </nav>
-              <div class="system-menu-info">
-                <span>Angemeldet</span>
-                <strong>${sessionUser.username}</strong>
-              </div>
-              <div class="system-menu-info">
-                <span>Rolle</span>
-                <strong>${roleLabel(sessionUser.role)}</strong>
-              </div>
-              <div class="system-menu-info">
-                <span>Version</span>
-                <strong>${systemVersionLabel()}</strong>
-              </div>
               ${systemInfo.canShutdown ? `<button class="danger-button small-button" type="button" data-system-shutdown>Herunterfahren</button>` : ""}
               <button class="action-button small-button menu-logout-button" type="button" data-logout>Logout</button>
             </div>
@@ -412,8 +400,7 @@ function adminMenuTemplate() {
     ["users", "Benutzer & Passwörter"],
     ["print", "Drucken"],
     ["data", "Daten & Vorlagen"],
-    ["settings", "Einstellungen"],
-    ["info", "Info"]
+    ["settings", "Einstellungen"]
   ];
   return `
     <div class="menu-section-title">Admin-Menü</div>
@@ -556,6 +543,9 @@ function cartRowTemplate(item) {
 }
 
 function renderAdmin() {
+  if (!canManage()) {
+    activeAdminSection = "info";
+  }
   const root = document.querySelector("[data-view-root]");
   const adminTemplates = {
     analysis: analysisTemplate,
@@ -574,7 +564,7 @@ function renderAdmin() {
       <section class="panel">
         <div class="panel-header">
           <div>
-            <h2>Admin</h2>
+            <h2>${canManage() ? "Admin" : "Info"}</h2>
           </div>
         </div>
       </section>
