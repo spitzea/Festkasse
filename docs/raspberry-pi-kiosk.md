@@ -6,8 +6,8 @@ Diese Anleitung richtet einen Raspberry Pi mit Raspberry Pi OS Lite als lokale F
 
 - Raspberry Pi OS Lite ist installiert.
 - SSH ist aktiviert.
-- Benutzername ist in den Beispielen `andreas`.
-- Das Repo ist unter `/home/andreas/Festkasse` geklont.
+- Die Beispiele verwenden den aktuell angemeldeten Linux-Benutzer über `$USER`.
+- Das Repo wird unter `$HOME/Festkasse` geklont.
 
 ## System aktualisieren
 
@@ -30,12 +30,6 @@ sudo apt install -y --no-install-recommends xserver-xorg xinit openbox unclutter
 Chromium installieren:
 
 ```bash
-sudo apt install -y --no-install-recommends chromium-browser
-```
-
-Falls `chromium-browser` nicht verfügbar ist:
-
-```bash
 sudo apt install -y --no-install-recommends chromium
 ```
 
@@ -47,7 +41,7 @@ npm --version
 git --version
 command -v startx
 command -v openbox-session
-command -v chromium-browser || command -v chromium
+command -v chromium
 command -v unclutter
 ```
 
@@ -85,8 +79,8 @@ After=network.target
 
 [Service]
 Type=simple
-User=andreas
-WorkingDirectory=/home/andreas/Festkasse
+User=<linux-user>
+WorkingDirectory=/home/<linux-user>/Festkasse
 ExecStart=/usr/bin/npm start
 Restart=always
 RestartSec=5
@@ -95,6 +89,8 @@ Environment=PORT=3000
 [Install]
 WantedBy=multi-user.target
 ```
+
+`<linux-user>` durch den tatsächlichen Linux-Benutzernamen ersetzen, zum Beispiel den Wert aus `whoami`.
 
 Aktivieren:
 
@@ -130,8 +126,7 @@ while ! curl -fsS http://localhost:3000 >/dev/null; do
   sleep 1
 done
 
-CHROMIUM="$(command -v chromium-browser || command -v chromium)"
-exec "$CHROMIUM" --kiosk --noerrdialogs --disable-infobars --disable-session-crashed-bubble http://localhost:3000
+exec chromium --kiosk --noerrdialogs --disable-infobars --disable-session-crashed-bubble http://localhost:3000
 ```
 
 Manuell testen:
@@ -142,19 +137,7 @@ startx
 
 ## Autologin
 
-Wenn `raspi-config` Console Autologin anbietet, dort aktivieren:
-
-```bash
-sudo raspi-config
-```
-
-Pfad:
-
-```text
-System Options -> Boot / Auto Login -> Console Autologin
-```
-
-Falls diese Option nicht angeboten wird, Autologin per systemd setzen:
+Autologin per systemd setzen:
 
 ```bash
 sudo mkdir -p /etc/systemd/system/getty@tty1.service.d
@@ -166,8 +149,10 @@ Inhalt:
 ```ini
 [Service]
 ExecStart=
-ExecStart=-/sbin/agetty --autologin andreas --noclear %I $TERM
+ExecStart=-/sbin/agetty --autologin <linux-user> --noclear %I $TERM
 ```
+
+`<linux-user>` wieder durch den tatsächlichen Linux-Benutzernamen ersetzen.
 
 Aktivieren:
 
@@ -203,8 +188,10 @@ sudo visudo -f /etc/sudoers.d/festkasse-shutdown
 Inhalt:
 
 ```text
-andreas ALL=(root) NOPASSWD: /usr/sbin/shutdown
+<linux-user> ALL=(root) NOPASSWD: /usr/sbin/shutdown
 ```
+
+Auch hier `<linux-user>` durch den tatsächlichen Linux-Benutzernamen ersetzen.
 
 Prüfen:
 

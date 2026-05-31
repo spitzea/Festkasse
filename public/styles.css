@@ -164,6 +164,58 @@ textarea:focus-visible {
   gap: 0.45rem;
 }
 
+.system-menu {
+  position: relative;
+}
+
+.menu-button {
+  display: inline-grid;
+  place-items: center;
+  gap: 0.18rem;
+  width: 2.65rem;
+  padding-inline: 0.65rem;
+}
+
+.menu-button span {
+  display: block;
+  width: 1.15rem;
+  height: 2px;
+  border-radius: var(--radius-pill);
+  background: currentColor;
+}
+
+.system-menu-panel {
+  position: absolute;
+  top: calc(100% + 0.45rem);
+  right: 0;
+  z-index: 40;
+  display: grid;
+  gap: var(--space-sm);
+  width: min(18rem, calc(100vw - 1rem));
+  padding: 0.8rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--panel);
+  box-shadow: var(--shadow-md);
+}
+
+.system-menu-info,
+.info-card {
+  display: grid;
+  gap: 0.2rem;
+}
+
+.system-menu-info span,
+.info-card span {
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
+.system-menu-info strong,
+.info-card strong {
+  overflow-wrap: anywhere;
+}
+
 .avatar-dot {
   display: grid;
   place-items: center;
@@ -774,7 +826,23 @@ textarea:focus-visible {
 }
 
 .login-shutdown-button {
-  width: 100%;
+  display: block;
+  width: fit-content;
+  margin: 0.75rem auto 0;
+  color: var(--muted);
+}
+
+.info-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr));
+  gap: var(--space-sm);
+}
+
+.info-card {
+  padding: 0.9rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--panel-strong);
 }
 
 .event-list {

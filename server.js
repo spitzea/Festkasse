@@ -3,7 +3,7 @@ const fs = require("fs");
 const fsp = require("fs/promises");
 const path = require("path");
 const crypto = require("crypto");
-const { execFile } = require("child_process");
+const { execFile, execFileSync } = require("child_process");
 
 const port = process.env.PORT || 3000;
 const publicDir = path.join(__dirname, "public");
@@ -13,6 +13,7 @@ const archiveDir = path.join(dataDir, "archive");
 const printsDir = path.join(dataDir, "prints");
 const defaultsPath = path.join(dataDir, "defaults.json");
 const activePath = path.join(dataDir, "fest.json");
+const packagePath = path.join(__dirname, "package.json");
 
 const contentTypes = {
   ".html": "text/html; charset=utf-8",
@@ -368,10 +369,32 @@ function sendError(res, error) {
   sendJson(res, error.status || 500, { error: error.message || "Serverfehler" });
 }
 
+function readPackageVersion() {
+  try {
+    return JSON.parse(fs.readFileSync(packagePath, "utf8")).version || "unknown";
+  } catch (error) {
+    return "unknown";
+  }
+}
+
+function readGitCommit() {
+  try {
+    return execFileSync("git", ["rev-parse", "--short", "HEAD"], {
+      cwd: __dirname,
+      encoding: "utf8",
+      windowsHide: true
+    }).trim();
+  } catch (error) {
+    return "unknown";
+  }
+}
+
 function systemInfo() {
   return {
     platform: process.platform,
-    canShutdown: process.platform === "linux"
+    canShutdown: process.platform === "linux",
+    appVersion: readPackageVersion(),
+    gitCommit: readGitCommit()
   };
 }
 

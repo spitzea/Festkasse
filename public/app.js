@@ -63,7 +63,7 @@ const adminDirtySections = new Set();
 const adminSavedSections = new Set();
 let eventCatalog = null;
 let bootError = "";
-let systemInfo = { platform: "unknown", canShutdown: false };
+let systemInfo = { platform: "unknown", canShutdown: false, appVersion: "unknown", gitCommit: "unknown" };
 
 async function loadState() {
   const response = await fetch("/api/state");
@@ -206,6 +206,12 @@ function roleLabel(role) {
   return role === "admin" ? "Admin" : "User";
 }
 
+function systemVersionLabel() {
+  const version = systemInfo.appVersion || "unknown";
+  const commit = systemInfo.gitCommit || "unknown";
+  return `${version} (${commit})`;
+}
+
 function uid(prefix) {
   return `${prefix}_${Date.now()}_${Math.random().toString(16).slice(2, 8)}`;
 }
@@ -337,7 +343,7 @@ function loginTemplate() {
           <div class="error hidden" data-login-error>Login fehlgeschlagen.</div>
         </form>
         ${systemInfo.canShutdown ? `
-          <button class="danger-button login-shutdown-button" type="button" data-system-shutdown>Raspberry herunterfahren</button>
+          <button class="ghost-button small-button login-shutdown-button" type="button" data-system-shutdown>Raspberry herunterfahren</button>
         ` : ""}
       </section>
     </main>
@@ -364,9 +370,23 @@ function shellTemplate() {
             <button class="tab-button ${activeView === "cashier" ? "active" : ""}" data-view="cashier">Kasse</button>
             ${adminTab}
           </nav>
-          <span class="role-pill user-chip"><span class="avatar-dot">${roleLabel(sessionUser.role).slice(0, 1)}</span>${roleLabel(sessionUser.role)}</span>
-          ${systemInfo.canShutdown ? `<button class="danger-button" data-system-shutdown>Herunterfahren</button>` : ""}
-          <button class="ghost-button" data-logout>Logout</button>
+          <div class="system-menu">
+            <button class="ghost-button menu-button" type="button" data-system-menu aria-label="Menü" aria-expanded="false">
+              <span></span><span></span><span></span>
+            </button>
+            <div class="system-menu-panel hidden" data-system-menu-panel>
+              <div class="system-menu-info">
+                <span>Angemeldet</span>
+                <strong>${roleLabel(sessionUser.role)} · ${sessionUser.username}</strong>
+              </div>
+              <div class="system-menu-info">
+                <span>Version</span>
+                <strong>${systemVersionLabel()}</strong>
+              </div>
+              ${systemInfo.canShutdown ? `<button class="danger-button small-button" type="button" data-system-shutdown>Herunterfahren</button>` : ""}
+              <button class="ghost-button small-button" type="button" data-logout>Logout</button>
+            </div>
+          </div>
         </div>
       </header>
       <section data-view-root></section>
@@ -516,7 +536,8 @@ function renderAdmin() {
     users: userAccessTemplate,
     print: printSettingsTemplate,
     data: dataManagementTemplate,
-    settings: settingsTemplate
+    settings: settingsTemplate,
+    info: infoTemplate
   };
   const content = (adminTemplates[activeAdminSection] || analysisTemplate)();
 
@@ -535,6 +556,7 @@ function renderAdmin() {
             <button class="tab-button ${activeAdminSection === "print" ? "active" : ""}" data-admin-section="print">Drucken</button>
             <button class="tab-button ${activeAdminSection === "data" ? "active" : ""}" data-admin-section="data">Daten & Vorlagen</button>
             <button class="tab-button ${activeAdminSection === "settings" ? "active" : ""}" data-admin-section="settings">Einstellungen</button>
+            <button class="tab-button ${activeAdminSection === "info" ? "active" : ""}" data-admin-section="info">Info</button>
           </nav>
         </div>
       </section>
@@ -831,6 +853,25 @@ function userAccessTemplate() {
   `;
 }
 
+function infoTemplate() {
+  return `
+    <section class="panel">
+      <div class="panel-header">
+        <div>
+          <h2>Info</h2>
+          <p>Version und Systemdaten für Fehleranalyse.</p>
+        </div>
+      </div>
+      <div class="info-grid">
+        <article class="info-card"><span>Programmversion</span><strong>${systemInfo.appVersion || "unknown"}</strong></article>
+        <article class="info-card"><span>Git-Version</span><strong>${systemInfo.gitCommit || "unknown"}</strong></article>
+        <article class="info-card"><span>System</span><strong>${systemInfo.platform || "unknown"}</strong></article>
+        <article class="info-card"><span>Angemeldet</span><strong>${sessionUser ? `${roleLabel(sessionUser.role)} · ${sessionUser.username}` : "-"}</strong></article>
+      </div>
+    </section>
+  `;
+}
+
 function printSettingsTemplate() {
   return `
     <section class="panel">
@@ -1038,7 +1079,17 @@ function bindShell() {
     });
   });
 
-  document.querySelector("[data-logout]").addEventListener("click", () => {
+  document.querySelector("[data-system-menu]")?.addEventListener("click", (event) => {
+    event.stopPropagation();
+    const panel = document.querySelector("[data-system-menu-panel]");
+    const expanded = panel?.classList.toggle("hidden") === false;
+    event.currentTarget.setAttribute("aria-expanded", String(expanded));
+    if (expanded) {
+      document.addEventListener("click", closeSystemMenu, { once: true });
+    }
+  });
+
+  document.querySelector("[data-logout]")?.addEventListener("click", () => {
     clearSessionUser();
     cart = [];
     paidAmount = "";
@@ -1047,6 +1098,11 @@ function bindShell() {
   document.querySelector("[data-system-shutdown]")?.addEventListener("click", shutdownSystem);
 
   startClock();
+}
+
+function closeSystemMenu() {
+  document.querySelector("[data-system-menu-panel]")?.classList.add("hidden");
+  document.querySelector("[data-system-menu]")?.setAttribute("aria-expanded", "false");
 }
 
 function startClock() {
