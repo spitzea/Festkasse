@@ -359,10 +359,6 @@ function loginTemplate() {
 }
 
 function shellTemplate() {
-  const adminTab = canManage()
-    ? `<button class="tab-button ${activeView === "admin" ? "active" : ""}" data-view="admin">Admin</button>`
-    : "";
-
   return `
     <main class="app-shell">
       <header class="topbar">
@@ -374,15 +370,16 @@ function shellTemplate() {
           </div>
         </div>
         <div class="top-actions">
-          <nav class="view-tabs">
-            <button class="tab-button ${activeView === "cashier" ? "active" : ""}" data-view="cashier">Kasse</button>
-            ${adminTab}
-          </nav>
           <div class="system-menu">
             <button class="ghost-button menu-button" type="button" data-system-menu aria-label="Menü" aria-expanded="false">
               <span></span><span></span><span></span>
             </button>
             <div class="system-menu-panel hidden" data-system-menu-panel>
+              <nav class="menu-nav">
+                <button class="tab-button ${activeView === "cashier" ? "active" : ""}" type="button" data-view="cashier">Kasse</button>
+                ${canManage() ? `<button class="tab-button ${activeView === "admin" ? "active" : ""}" type="button" data-view="admin">Admin</button>` : ""}
+                ${canManage() ? adminMenuTemplate() : ""}
+              </nav>
               <div class="system-menu-info">
                 <span>Angemeldet</span>
                 <strong>${sessionUser.username}</strong>
@@ -404,6 +401,25 @@ function shellTemplate() {
       <section data-view-root></section>
       <div class="toast hidden" data-toast></div>
     </main>
+  `;
+}
+
+function adminMenuTemplate() {
+  const items = [
+    ["analysis", "Tagesauswertung"],
+    ["articles", "Artikel verwalten"],
+    ["categories", "Kategorien verwalten"],
+    ["users", "Benutzer & Passwörter"],
+    ["print", "Drucken"],
+    ["data", "Daten & Vorlagen"],
+    ["settings", "Einstellungen"],
+    ["info", "Info"]
+  ];
+  return `
+    <div class="menu-section-title">Admin-Menü</div>
+    ${items.map(([section, label]) => `
+      <button class="ghost-button small-button ${activeView === "admin" && activeAdminSection === section ? "active" : ""}" type="button" data-admin-section="${section}">${label}</button>
+    `).join("")}
   `;
 }
 
@@ -560,16 +576,6 @@ function renderAdmin() {
           <div>
             <h2>Admin</h2>
           </div>
-          <nav class="view-tabs">
-            <button class="tab-button ${activeAdminSection === "analysis" ? "active" : ""}" data-admin-section="analysis">Tagesauswertung</button>
-            <button class="tab-button ${activeAdminSection === "articles" ? "active" : ""}" data-admin-section="articles">Artikel verwalten</button>
-            <button class="tab-button ${activeAdminSection === "categories" ? "active" : ""}" data-admin-section="categories">Kategorien verwalten</button>
-            <button class="tab-button ${activeAdminSection === "users" ? "active" : ""}" data-admin-section="users">Benutzer & Passwörter</button>
-            <button class="tab-button ${activeAdminSection === "print" ? "active" : ""}" data-admin-section="print">Drucken</button>
-            <button class="tab-button ${activeAdminSection === "data" ? "active" : ""}" data-admin-section="data">Daten & Vorlagen</button>
-            <button class="tab-button ${activeAdminSection === "settings" ? "active" : ""}" data-admin-section="settings">Einstellungen</button>
-            <button class="tab-button ${activeAdminSection === "info" ? "active" : ""}" data-admin-section="info">Info</button>
-          </nav>
         </div>
       </section>
       ${content}
@@ -867,6 +873,16 @@ function userAccessTemplate() {
 
 function infoTemplate() {
   const display = browserDisplayInfo();
+  const rows = [
+    ["Programmversion", systemInfo.appVersion || "unknown"],
+    ["Git-Version", systemInfo.gitCommit || "unknown"],
+    ["System", systemInfo.platform || "unknown"],
+    ["Angemeldet", sessionUser?.username || "-"],
+    ["Rolle", sessionUser ? roleLabel(sessionUser.role) : "-"],
+    ["Browser-Viewport", display.viewport],
+    ["Bildschirm", display.screenSize],
+    ["Pixelverhältnis", display.pixelRatio]
+  ];
   return `
     <section class="panel">
       <div class="panel-header">
@@ -875,16 +891,11 @@ function infoTemplate() {
           <p>Version und Systemdaten für Fehleranalyse.</p>
         </div>
       </div>
-      <div class="info-grid">
-        <article class="info-card"><span>Programmversion</span><strong>${systemInfo.appVersion || "unknown"}</strong></article>
-        <article class="info-card"><span>Git-Version</span><strong>${systemInfo.gitCommit || "unknown"}</strong></article>
-        <article class="info-card"><span>System</span><strong>${systemInfo.platform || "unknown"}</strong></article>
-        <article class="info-card"><span>Angemeldet</span><strong>${sessionUser?.username || "-"}</strong></article>
-        <article class="info-card"><span>Rolle</span><strong>${sessionUser ? roleLabel(sessionUser.role) : "-"}</strong></article>
-        <article class="info-card"><span>Browser-Viewport</span><strong>${display.viewport}</strong></article>
-        <article class="info-card"><span>Bildschirm</span><strong>${display.screenSize}</strong></article>
-        <article class="info-card"><span>Pixelverhältnis</span><strong>${display.pixelRatio}</strong></article>
-      </div>
+      <table class="info-table">
+        <tbody>
+          ${rows.map(([label, value]) => `<tr><th>${label}</th><td>${value}</td></tr>`).join("")}
+        </tbody>
+      </table>
     </section>
   `;
 }
@@ -1106,6 +1117,14 @@ function bindShell() {
     }
   });
 
+  document.querySelectorAll(".system-menu [data-admin-section]").forEach((button) => {
+    button.addEventListener("click", () => {
+      activeView = "admin";
+      activeAdminSection = button.dataset.adminSection;
+      render();
+    });
+  });
+
   document.querySelector("[data-logout]")?.addEventListener("click", () => {
     clearSessionUser();
     cart = [];
@@ -1179,7 +1198,7 @@ function updateChangeOutput() {
 }
 
 function bindAdmin() {
-  document.querySelectorAll("[data-admin-section]").forEach((button) => {
+  document.querySelectorAll(".admin-layout [data-admin-section]").forEach((button) => {
     button.addEventListener("click", () => {
       activeAdminSection = button.dataset.adminSection;
       renderAdmin();
@@ -2063,6 +2082,16 @@ function showToast(message, type = inferToastType(message)) {
   toastTimer = setTimeout(() => toast.classList.add("hidden"), type === "error" ? 3600 : 2200);
 }
 
+async function softRefreshApp() {
+  try {
+    state = await loadState();
+    render();
+    showToast("Ansicht aktualisiert.");
+  } catch (error) {
+    showToast("Aktualisieren fehlgeschlagen.");
+  }
+}
+
 async function init() {
   try {
     state = await loadState();
@@ -2072,5 +2101,12 @@ async function init() {
   }
   render();
 }
+
+document.addEventListener("keydown", (event) => {
+  const reloadKey = event.key === "F5" || ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "r");
+  if (!reloadKey) return;
+  event.preventDefault();
+  softRefreshApp();
+});
 
 init();

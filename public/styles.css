@@ -196,7 +196,7 @@ textarea:focus-visible {
   z-index: 40;
   display: grid;
   gap: var(--space-sm);
-  width: min(18rem, calc(100vw - 1rem));
+  width: min(22rem, calc(100vw - 1rem));
   padding: 0.8rem;
   border: 1px solid var(--line);
   border-radius: var(--radius-md);
@@ -208,24 +208,47 @@ textarea:focus-visible {
   width: 100%;
 }
 
+.menu-nav {
+  display: grid;
+  gap: 0.4rem;
+  padding-bottom: var(--space-sm);
+  border-bottom: 1px solid var(--line);
+}
+
+.menu-section-title {
+  margin-top: 0.2rem;
+  color: var(--muted);
+  font-size: 0.8rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.menu-nav .tab-button,
+.menu-nav .ghost-button {
+  justify-content: flex-start;
+  text-align: left;
+}
+
+.menu-nav .ghost-button.active {
+  border-color: color-mix(in srgb, var(--red) 60%, var(--line));
+  background: var(--red-soft);
+}
+
 .menu-logout-button {
   color: #f7e4b2;
 }
 
-.system-menu-info,
-.info-card {
+.system-menu-info {
   display: grid;
   gap: 0.2rem;
 }
 
-.system-menu-info span,
-.info-card span {
+.system-menu-info span {
   color: var(--muted);
   font-size: 0.8rem;
 }
 
-.system-menu-info strong,
-.info-card strong {
+.system-menu-info strong {
   overflow-wrap: anywhere;
 }
 
@@ -844,17 +867,28 @@ textarea:focus-visible {
   color: var(--muted);
 }
 
-.info-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr));
-  gap: var(--space-sm);
+.info-table {
+  width: 100%;
+  border-collapse: collapse;
 }
 
-.info-card {
-  padding: 0.9rem;
-  border: 1px solid var(--line);
-  border-radius: var(--radius-md);
-  background: var(--panel-strong);
+.info-table th,
+.info-table td {
+  padding: 0.75rem 1rem;
+  border-top: 1px solid var(--line);
+  text-align: left;
+  vertical-align: top;
+}
+
+.info-table th {
+  width: 14rem;
+  color: var(--muted);
+  font-weight: 700;
+}
+
+.info-table td {
+  font-weight: 800;
+  overflow-wrap: anywhere;
 }
 
 .event-list {
