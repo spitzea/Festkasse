@@ -221,6 +221,9 @@ function syncArticleCategoryColors(categoryName, color) {
 }
 
 function money(value) {
+  if ((state.settings.currency || "EUR") === "EUR") {
+    return `${new Intl.NumberFormat("de-DE", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(value || 0)} €`;
+  }
   return new Intl.NumberFormat("de-DE", { style: "currency", currency: state.settings.currency }).format(value || 0);
 }
 
@@ -247,13 +250,12 @@ function shortDateTime(date = new Date()) {
 }
 
 function cashierDateTime(date = new Date()) {
-  return `${new Intl.DateTimeFormat("de-DE", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit"
-  }).format(date)} Uhr`;
+  const day = String(date.getDate()).padStart(2, "0");
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const year = date.getFullYear();
+  const hour = String(date.getHours()).padStart(2, "0");
+  const minute = String(date.getMinutes()).padStart(2, "0");
+  return `${day}.${month}.${year} ${hour}:${minute}`;
 }
 
 function roleLabel(role) {
