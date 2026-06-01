@@ -34,7 +34,7 @@ Zielgruppe:
 
 ### Voraussetzungen
 
-- Node.js 20 oder hoeher
+- Node.js 18.17 oder hoeher, empfohlen Node.js 20 LTS
 - npm
 - Moderner Browser wie Microsoft Edge, Google Chrome, Chromium oder Safari
 - Optional: Git, wenn das Projekt direkt aus GitHub geklont oder aktualisiert werden soll
@@ -52,7 +52,7 @@ cd Festkasse
 npm install
 ```
 
-Aktuell hat die Anwendung keine externen npm-Abhaengigkeiten. `npm install` bleibt trotzdem der Standardbefehl fuer neue Installationen und spaetere Updates.
+`npm install` installiert die benoetigten Pakete, unter anderem `serialport` fuer den direkten seriellen Thermodrucker.
 
 ### Starten der Anwendung
 
@@ -133,9 +133,11 @@ Im Bereich **Drucken** kann der Druckmodus gesetzt werden:
 
 - `Browserdruck`: nutzt den normalen Druckdialog des Browsers.
 - `Textdatei-Testdruck`: schreibt Testbons und Auswertungen als TXT-Dateien nach `data/prints`.
-- `Serieller Thermodrucker`: vorbereitet fuer Ports wie `COM3` oder `/dev/ttyUSB0`.
+- `Serieller Thermodrucker`: schreibt ESC/POS direkt per `serialport` auf einen seriellen Port, standardmaessig `/dev/ttyUSB0`.
 
 Tagesauswertungen und historische Tagesabschluesse nutzen dieselbe zentrale Druckeinstellung.
+
+Fuer den seriellen Thermodrucker wird kein CUPS, `lp`, `lpr` oder System-Druckdialog verwendet. Die getestete Grundkonfiguration ist `9600 8N1` mit XON/XOFF-Flusskontrolle. Jeder Bon wird mit `ESC @` initialisiert und nach dem Druck mit `GS V A 16` teilweise geschnitten.
 
 ## Haftungsausschluss
 

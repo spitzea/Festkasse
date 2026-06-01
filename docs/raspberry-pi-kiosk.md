@@ -23,7 +23,7 @@ Nach dem Neustart wieder per SSH oder lokal anmelden.
 
 ```bash
 sudo apt update
-sudo apt install -y git nodejs npm lsof curl
+sudo apt install -y git nodejs npm lsof curl build-essential python3 make g++
 sudo apt install -y --no-install-recommends xserver-xorg xinit openbox unclutter x11-xserver-utils numlockx python3-xdg
 ```
 
@@ -66,6 +66,37 @@ cd ~/Festkasse
 git pull
 npm install
 ```
+
+## Thermodrucker per USB-RS232
+
+Getestete Konfiguration:
+
+- Port: `/dev/ttyUSB0`
+- Baudrate: `9600`
+- Datenformat: `8N1`
+- Flusskontrolle: XON/XOFF
+- Druckprotokoll: ESC/POS direkt ueber `serialport`
+
+Der Linux-Benutzer muss auf den seriellen Port zugreifen duerfen:
+
+```bash
+sudo usermod -aG dialout $(whoami)
+sudo reboot
+```
+
+Nach dem Neustart pruefen:
+
+```bash
+ls -l /dev/ttyUSB0
+printf '\x1B\x40TEST\r\n\r\n\x1D\x56\x41\x10' > /dev/ttyUSB0
+```
+
+In der Festkasse unter **Admin -> Drucken**:
+
+- Druckmodus: `Serieller Thermodrucker`
+- Drucker-Port: `/dev/ttyUSB0`
+- Speichern
+- `Testbon drucken`
 
 ## Festkasse-Service
 

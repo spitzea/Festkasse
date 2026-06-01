@@ -6,7 +6,7 @@ Diese Anleitung richtet die Festkasse auf einem Windows-Rechner ein.
 
 - Windows 10 oder Windows 11
 - Browser: Microsoft Edge, Google Chrome oder Chromium
-- Node.js LTS
+- Node.js 18.17 oder hoeher, empfohlen Node.js 20 LTS
 - Optional: Git for Windows, wenn das Projekt direkt aus GitHub geholt oder aktualisiert werden soll
 
 ## Programme installieren
@@ -52,7 +52,7 @@ git pull
 npm install
 ```
 
-`npm install` installiert die in `package.json` definierten Pakete. Aktuell hat die Festkasse keine externen npm-Abhängigkeiten, der Befehl ist trotzdem der richtige Standard für neue Installationen und spätere Updates.
+`npm install` installiert die in `package.json` definierten Pakete, unter anderem `serialport` fuer den direkten seriellen Thermodrucker.
 
 ## Starten
 

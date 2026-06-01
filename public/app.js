@@ -36,7 +36,7 @@ const seedData = {
     defaultWarningStock: 5,
     printerName: "Browserdruck",
     printerMode: "browser",
-    printerPort: "",
+    printerPort: "/dev/ttyUSB0",
     printOutputDir: "data/prints",
     receiptFooter: "Vielen Dank!",
     logoDataUrl: "",
@@ -992,12 +992,13 @@ function repositoryLinkTemplate() {
 }
 
 function printSettingsTemplate() {
+  const isSerialMode = state.settings.printerMode === "serial";
   return `
     <section class="panel">
       <div class="panel-header">
         <div>
           <h2>Drucken</h2>
-          <p>Browserdruck, Testdateien und Thermodrucker vorbereiten.</p>
+          <p>Browserdruck, Testdateien und serieller Thermodrucker.</p>
         </div>
         <div class="header-actions">
           ${dirtyIndicator("print")}
@@ -1015,14 +1016,14 @@ function printSettingsTemplate() {
         </div>
         <div class="field">
           <label>Drucker-Port</label>
-          <input name="printerPort" value="${state.settings.printerPort || ""}" placeholder="COM3 oder /dev/ttyUSB0" />
+          <input name="printerPort" value="${state.settings.printerPort || "/dev/ttyUSB0"}" placeholder="/dev/ttyUSB0" />
         </div>
         <div class="field">
           <label>Testdruck-Verzeichnis</label>
           <input name="printOutputDir" value="${state.settings.printOutputDir || "data/prints"}" />
         </div>
         <div class="field settings-test-print">
-          <button class="action-button" type="button" data-test-print>Testbon als TXT schreiben</button>
+          <button class="action-button" type="button" data-test-print>${isSerialMode ? "Testbon drucken" : "Testbon als TXT schreiben"}</button>
         </div>
       </form>
     </section>
@@ -1343,7 +1344,13 @@ function bindAdmin() {
   document.querySelectorAll("[data-settings-form]").forEach((formElement) => {
     const section = formElement.dataset.settingsSection || activeAdminSection;
     formElement.addEventListener("input", () => markAdminDirty(section));
-    formElement.addEventListener("change", () => markAdminDirty(section));
+    formElement.addEventListener("change", (event) => {
+      markAdminDirty(section);
+      if (event.target?.name === "printerMode") {
+        const testButton = document.querySelector("[data-test-print]");
+        if (testButton) testButton.textContent = event.target.value === "serial" ? "Testbon drucken" : "Testbon als TXT schreiben";
+      }
+    });
     formElement.addEventListener("submit", (event) => {
       event.preventDefault();
       saveSettings(section, event.submitter);
@@ -2046,15 +2053,15 @@ async function printReceipt(receipts, total, isFree, receiptTime = new Date()) {
 }
 
 async function testPrint(button) {
-  const finishButton = setButtonState(button, "Schreibe...");
   const formElement = document.querySelector("[data-settings-form]");
   const form = formElement ? new FormData(formElement) : new FormData();
   const settings = {
     ...state.settings,
     printerMode: String(form.get("printerMode") || state.settings.printerMode || "browser"),
-    printerPort: String(form.get("printerPort") || state.settings.printerPort || "").trim(),
+    printerPort: String(form.get("printerPort") || state.settings.printerPort || "/dev/ttyUSB0").trim(),
     printOutputDir: String(form.get("printOutputDir") || state.settings.printOutputDir || "data/prints").trim()
   };
+  const finishButton = setButtonState(button, settings.printerMode === "serial" ? "Drucke..." : "Schreibe...");
 
   const response = await fetch("/api/print/test", {
     method: "POST",
@@ -2069,7 +2076,7 @@ async function testPrint(button) {
     return;
   }
 
-  finishButton("Geschrieben");
+  finishButton(payload.mode === "serial" ? "Gedruckt" : "Geschrieben");
   showToast(payload.files?.length ? `Testbon geschrieben: ${payload.files[0]}` : "Testdruck ausgeführt.");
   window.setTimeout(() => finishButton(), 1200);
 }

@@ -19,6 +19,7 @@ const defaultsPath = path.join(dataDir, "defaults.json");
 const activePath = path.join(dataDir, "fest.json");
 const packagePath = path.join(__dirname, "package.json");
 const latestVersionUrl = process.env.FESTKASSE_LATEST_VERSION_URL || "https://raw.githubusercontent.com/spitzea/Festkasse/main/package.json";
+const defaultSerialPrinterPort = "/dev/ttyUSB0";
 
 const contentTypes = {
   ".html": "text/html; charset=utf-8",
@@ -74,7 +75,7 @@ const defaultState = {
     defaultWarningStock: 5,
     printerName: "Browserdruck",
     printerMode: "browser",
-    printerPort: "",
+    printerPort: defaultSerialPrinterPort,
     printOutputDir: "data/prints",
     receiptFooter: "Vielen Dank!",
     logoDataUrl: "",
@@ -327,6 +328,69 @@ function formatReportText(report, settings) {
 
   lines.push("", "");
   return `${lines.join("\n")}\n`;
+}
+
+function toPrinterText(text) {
+  return String(text || "").replace(/\r?\n/g, "\r\n");
+}
+
+function escposPrintJob(text) {
+  return Buffer.concat([
+    Buffer.from([0x1b, 0x40]),
+    Buffer.from(toPrinterText(text), "utf8"),
+    Buffer.from([0x1d, 0x56, 0x41, 0x10])
+  ]);
+}
+
+function loadSerialPort() {
+  try {
+    return require("serialport").SerialPort;
+  } catch (error) {
+    throw Object.assign(new Error("Paket 'serialport' ist nicht installiert. Bitte 'npm install' ausführen."), { status: 503, cause: error });
+  }
+}
+
+function serialErrorMessage(error, portPath) {
+  const detail = error?.message ? ` (${error.message})` : "";
+  return `Thermodrucker auf ${portPath} nicht erreichbar${detail}.`;
+}
+
+async function writeSerialPrinter(buffer, settings) {
+  const SerialPort = loadSerialPort();
+  const portPath = String(settings.printerPort || defaultSerialPrinterPort).trim() || defaultSerialPrinterPort;
+  const serialPort = new SerialPort({
+    path: portPath,
+    baudRate: 9600,
+    dataBits: 8,
+    parity: "none",
+    stopBits: 1,
+    xon: true,
+    xoff: true,
+    rtscts: false,
+    autoOpen: false
+  });
+
+  try {
+    await new Promise((resolve, reject) => serialPort.open((error) => (error ? reject(error) : resolve())));
+    await new Promise((resolve, reject) => serialPort.write(buffer, (error) => (error ? reject(error) : resolve())));
+    await new Promise((resolve, reject) => serialPort.drain((error) => (error ? reject(error) : resolve())));
+  } catch (error) {
+    throw Object.assign(new Error(serialErrorMessage(error, portPath)), { status: 503, cause: error });
+  } finally {
+    if (serialPort.isOpen) {
+      await new Promise((resolve) => serialPort.close(() => resolve()));
+    }
+  }
+}
+
+async function printReceiptsSerial(receipts, settings) {
+  const jobs = (Array.isArray(receipts) ? receipts : []).map((receipt) => escposPrintJob(formatReceiptText(receipt, settings)));
+  if (!jobs.length) return;
+  await writeSerialPrinter(Buffer.concat(jobs), settings);
+}
+
+async function printReportSerial(report, settings) {
+  await writeSerialPrinter(escposPrintJob(formatReportText(report, settings)), settings);
 }
 
 async function writeReceiptTextFiles(receipts, settings) {
@@ -678,7 +742,8 @@ async function handleApi(req, res, urlPath) {
     }
 
     if (mode === "serial") {
-      sendJson(res, 501, { error: "Serieller Druck ist vorbereitet, aber noch nicht aktiviert." });
+      await printReceiptsSerial(body.receipts || [], settings);
+      sendJson(res, 200, { ok: true, mode, files: [] });
       return;
     }
 
@@ -699,7 +764,8 @@ async function handleApi(req, res, urlPath) {
     }
 
     if (mode === "serial") {
-      sendJson(res, 501, { error: "Serieller Druck ist vorbereitet, aber noch nicht aktiviert." });
+      await printReportSerial(body.report || {}, settings);
+      sendJson(res, 200, { ok: true, mode, files: [] });
       return;
     }
 
@@ -727,7 +793,8 @@ async function handleApi(req, res, urlPath) {
     }
 
     if (mode === "serial") {
-      sendJson(res, 501, { error: "Serieller Testdruck ist vorbereitet, aber noch nicht aktiviert." });
+      await printReceiptsSerial([receipt], settings);
+      sendJson(res, 200, { ok: true, mode, files: [] });
       return;
     }
 

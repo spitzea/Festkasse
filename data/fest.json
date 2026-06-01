@@ -172,7 +172,7 @@
     "defaultWarningStock": 5,
     "printerName": "Browserdruck",
     "printerMode": "browser",
-    "printerPort": "",
+    "printerPort": "/dev/ttyUSB0",
     "printOutputDir": "data/prints",
     "receiptFooter": "Vielen Dank!",
     "logoDataUrl": "",
