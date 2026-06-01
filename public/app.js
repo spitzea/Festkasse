@@ -69,35 +69,20 @@ let versionCheckStarted = false;
 let printerStatus = { online: false, label: "Drucker Offline", mode: "browser" };
 let printerStatusTimer = null;
 let themeMode = normalizeThemeMode(window.localStorage.getItem(THEME_STORAGE_KEY));
-let themeMediaQuery = null;
 
 function normalizeThemeMode(mode) {
-  return ["auto", "light", "dark"].includes(mode) ? mode : "auto";
-}
-
-function resolvedTheme(mode = themeMode) {
-  if (mode === "auto") {
-    return window.matchMedia?.("(prefers-color-scheme: dark)").matches ? "dark" : "light";
-  }
-  return mode;
+  return mode === "light" ? "light" : "dark";
 }
 
 function applyTheme(mode = themeMode) {
   themeMode = normalizeThemeMode(mode);
   document.documentElement.dataset.themeMode = themeMode;
-  document.documentElement.dataset.theme = resolvedTheme(themeMode);
+  document.documentElement.dataset.theme = themeMode;
 }
 
 function setThemeMode(mode) {
   applyTheme(mode);
   window.localStorage.setItem(THEME_STORAGE_KEY, themeMode);
-}
-
-function bindThemeAutoUpdates() {
-  themeMediaQuery = window.matchMedia?.("(prefers-color-scheme: dark)");
-  themeMediaQuery?.addEventListener?.("change", () => {
-    if (themeMode === "auto") applyTheme("auto");
-  });
 }
 
 applyTheme(themeMode);
@@ -483,19 +468,14 @@ function adminMenuTemplate() {
 }
 
 function themeMenuTemplate() {
-  const options = [
-    ["auto", "Auto"],
-    ["light", "Hell"],
-    ["dark", "Dunkel"]
-  ];
   return `
     <div class="theme-menu" role="group" aria-label="Designmodus">
       <span class="menu-section-title">Design</span>
-      <div class="theme-options">
-        ${options.map(([value, label]) => `
-          <button class="ghost-button small-button ${themeMode === value ? "active" : ""}" type="button" data-theme-mode="${value}">${label}</button>
-        `).join("")}
-      </div>
+      <button class="theme-toggle ${themeMode === "light" ? "light" : "dark"}" type="button" data-theme-toggle aria-label="Design zwischen Hell und Dunkel wechseln">
+        <span class="theme-toggle-option sun">☀</span>
+        <span class="theme-toggle-option moon">☾</span>
+        <span class="theme-toggle-thumb"></span>
+      </button>
     </div>
   `;
 }
@@ -1253,11 +1233,9 @@ function bindShell() {
     });
   });
 
-  document.querySelectorAll("[data-theme-mode]").forEach((button) => {
-    button.addEventListener("click", () => {
-      setThemeMode(button.dataset.themeMode);
-      render();
-    });
+  document.querySelector("[data-theme-toggle]")?.addEventListener("click", () => {
+    setThemeMode(themeMode === "light" ? "dark" : "light");
+    render();
   });
 
   document.querySelector("[data-logout]")?.addEventListener("click", () => {
@@ -2384,7 +2362,6 @@ async function softRefreshApp() {
 }
 
 async function init() {
-  bindThemeAutoUpdates();
   try {
     state = await loadState();
     restoreSessionUser();
