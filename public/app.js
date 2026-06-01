@@ -2139,7 +2139,7 @@ function receiptTemplate(item, receiptTime, isFree) {
     <article class="receipt-ticket">
       <h1>${state.settings.eventName}</h1>
       <p class="receipt-club">${state.settings.clubName}</p>
-      <p class="receipt-meta">Bon #${formatReceiptNumber(item.receiptNumber)} · ${shortDateTime(receiptTime)}</p>
+      <p class="receipt-meta">Bon #${formatReceiptNumber(item.receiptNumber)} · ${cashierDateTime(receiptTime)}</p>
       <div class="receipt-divider"></div>
       <strong class="receipt-item">${item.articleName || item.name}</strong>
       ${isFree ? `<span class="receipt-free">Kostenlos</span>` : `<span class="receipt-price">${money(item.price ?? item.unitPrice)}</span>`}

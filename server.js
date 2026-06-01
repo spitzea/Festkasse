@@ -254,11 +254,45 @@ function padText(text, width, align = "left") {
   return align === "right" ? `${spaces}${value}` : `${value}${spaces}`;
 }
 
+function centerText(text, width) {
+  const value = String(text ?? "");
+  if (value.length >= width) return value;
+  const left = Math.floor((width - value.length) / 2);
+  return `${" ".repeat(left)}${value}`;
+}
+
+function wrapText(text, width) {
+  const words = String(text || "").trim().split(/\s+/).filter(Boolean);
+  const lines = [];
+  let line = "";
+  for (const word of words) {
+    if (!line) {
+      line = word;
+    } else if (`${line} ${word}`.length <= width) {
+      line = `${line} ${word}`;
+    } else {
+      lines.push(line);
+      line = word;
+    }
+  }
+  if (line) lines.push(line);
+  return lines.length ? lines : [""];
+}
+
 function moneyText(value, currency = "EUR") {
   if (currency === "EUR") {
-    return `${new Intl.NumberFormat("de-DE", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(Number(value) || 0)} €`;
+    return `${new Intl.NumberFormat("de-DE", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(Number(value) || 0)} \u20ac`;
   }
   return new Intl.NumberFormat("de-DE", { style: "currency", currency }).format(Number(value) || 0);
+}
+
+function receiptDateTimeText(date = new Date()) {
+  const day = String(date.getDate()).padStart(2, "0");
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const year = date.getFullYear();
+  const hour = String(date.getHours()).padStart(2, "0");
+  const minute = String(date.getMinutes()).padStart(2, "0");
+  return `${day}.${month}.${year} ${hour}:${minute}`;
 }
 
 function formatReceiptText(receipt, settings) {
@@ -266,21 +300,21 @@ function formatReceiptText(receipt, settings) {
   const time = receipt.createdAt ? new Date(receipt.createdAt) : new Date();
   const receiptNumber = formatReceiptNumber(receipt.receiptNumber);
   const lines = [
-    settings.eventName || "Festkasse",
-    settings.clubName || "",
+    centerText(settings.eventName || "Festkasse", width),
+    centerText(settings.clubName || "", width),
     "-".repeat(width),
     "",
-    String(receipt.articleName || "Artikel"),
+    ...wrapText(receipt.articleName || "Artikel", width).map((line) => centerText(line, width)),
   ];
 
   if (!receipt.isFree) {
-    lines.push(moneyText(receipt.price, settings.currency));
+    lines.push(centerText(moneyText(receipt.price, settings.currency), width));
   }
 
   lines.push(
     "",
     "-".repeat(width),
-    `Bon #${receiptNumber}  ${time.toLocaleDateString("de-DE")} ${time.toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" })}`
+    centerText(`Bon #${receiptNumber}  ${receiptDateTimeText(time)}`, width)
   );
 
   if (receipt.isFree) {
@@ -384,8 +418,45 @@ function escposPrintJob(text) {
     Buffer.from([0x1b, 0x40]),
     Buffer.from([0x1b, 0x74, 0x10]),
     encodePrinterText(text),
-    Buffer.from([0x1d, 0x56, 0x41, 0x10])
+    Buffer.from([0x1d, 0x56, 0x01])
   ]);
+}
+
+function escposText(text) {
+  return encodePrinterText(text);
+}
+
+function escposReceiptJob(receipt, settings) {
+  const width = 42;
+  const time = receipt.createdAt ? new Date(receipt.createdAt) : new Date();
+  const receiptNumber = formatReceiptNumber(receipt.receiptNumber);
+  const articleLines = wrapText(receipt.articleName || "Artikel", width).map((line) => `${centerText(line, width)}\r\n`);
+  const chunks = [
+    Buffer.from([0x1b, 0x40]),
+    Buffer.from([0x1b, 0x74, 0x10]),
+    Buffer.from([0x1b, 0x61, 0x01]),
+    escposText(`${settings.eventName || "Festkasse"}\r\n`),
+    escposText(`${settings.clubName || ""}\r\n`),
+    escposText(`${"-".repeat(width)}\r\n\r\n`),
+    Buffer.from([0x1b, 0x45, 0x01]),
+    Buffer.from([0x1d, 0x21, 0x01]),
+    ...articleLines.map(escposText),
+    Buffer.from([0x1d, 0x21, 0x00]),
+    Buffer.from([0x1b, 0x45, 0x00])
+  ];
+
+  if (!receipt.isFree) {
+    chunks.push(escposText(`\r\n${moneyText(receipt.price, settings.currency)}\r\n`));
+  } else {
+    chunks.push(escposText("\r\nKostenlos\r\n"));
+  }
+
+  chunks.push(
+    escposText(`\r\n${"-".repeat(width)}\r\n`),
+    escposText(`Bon #${receiptNumber}  ${receiptDateTimeText(time)}\r\n\r\n\r\n`),
+    Buffer.from([0x1d, 0x56, 0x01])
+  );
+  return Buffer.concat(chunks);
 }
 
 function loadSerialPort() {
@@ -430,7 +501,7 @@ async function writeSerialPrinter(buffer, settings) {
 }
 
 async function printReceiptsSerial(receipts, settings) {
-  const jobs = (Array.isArray(receipts) ? receipts : []).map((receipt) => escposPrintJob(formatReceiptText(receipt, settings)));
+  const jobs = (Array.isArray(receipts) ? receipts : []).map((receipt) => escposReceiptJob(receipt, settings));
   if (!jobs.length) return;
   await writeSerialPrinter(Buffer.concat(jobs), settings);
 }
