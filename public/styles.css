@@ -323,11 +323,6 @@ textarea:focus-visible {
   padding: 0.75rem clamp(0.75rem, 2vw, 1.4rem) 1rem;
 }
 
-.top-clock {
-  min-height: 2.9rem;
-  align-items: center;
-}
-
 .panel {
   background: rgba(32, 32, 36, 0.94);
   border: 1px solid var(--line);
@@ -535,6 +530,54 @@ textarea:focus-visible {
   color: var(--text);
   line-height: 1.35;
   overflow-wrap: anywhere;
+}
+
+.cashier-status-box {
+  display: grid;
+  gap: 0.45rem;
+  padding: 0.85rem;
+  min-height: 4.5rem;
+  background:
+    linear-gradient(180deg, rgba(229, 57, 53, 0.08), rgba(32, 18, 20, 0.34)),
+    var(--panel-soft);
+  border-color: color-mix(in srgb, var(--danger) 82%, var(--line));
+}
+
+.cashier-status-box.online {
+  background:
+    linear-gradient(180deg, rgba(34, 197, 94, 0.08), rgba(18, 32, 24, 0.3)),
+    var(--panel-soft);
+  border-color: color-mix(in srgb, var(--green) 72%, var(--line));
+}
+
+.cashier-status-box strong {
+  font-size: 0.98rem;
+  line-height: 1.2;
+}
+
+.printer-state {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: #ffb4b4;
+  font-weight: 900;
+}
+
+.printer-state.online {
+  color: #a8e6bf;
+}
+
+.printer-dot {
+  width: 0.8rem;
+  height: 0.8rem;
+  border-radius: var(--radius-pill);
+  background: var(--danger);
+  box-shadow: 0 0 0 3px rgba(229, 57, 53, 0.16);
+}
+
+.printer-state.online .printer-dot {
+  background: var(--green);
+  box-shadow: 0 0 0 3px rgba(63, 166, 107, 0.16);
 }
 
 .empty-state {

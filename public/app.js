@@ -85,6 +85,8 @@ let lastCheckout = null;
 let undoCheckoutTimer = null;
 let systemInfoRefreshPending = false;
 let versionCheckStarted = false;
+let printerStatus = { online: false, label: "Drucker Offline", mode: "browser" };
+let printerStatusTimer = null;
 
 async function loadState() {
   const response = await fetch("/api/state");
@@ -242,6 +244,16 @@ function editableMoneyInput(value) {
 
 function shortDateTime(date = new Date()) {
   return `${date.toLocaleDateString("de-DE")} ${date.toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" })}`;
+}
+
+function cashierDateTime(date = new Date()) {
+  return `${new Intl.DateTimeFormat("de-DE", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit"
+  }).format(date)} Uhr`;
 }
 
 function roleLabel(role) {
@@ -420,7 +432,6 @@ function shellTemplate() {
           </div>
         </div>
         <div class="top-actions">
-          <span class="stock-pill top-clock" data-clock>${shortDateTime()}</span>
           <button class="tab-button ${activeView === "cashier" ? "active" : ""}" type="button" data-view="cashier">Kasse</button>
           <div class="system-menu">
             <button class="ghost-button menu-button" type="button" data-system-menu aria-label="Menü" aria-expanded="false">
@@ -504,6 +515,7 @@ function renderCashier() {
       <div class="cart-column">
         ${cartTemplate()}
         ${cashierContactTemplate()}
+        ${cashierStatusTemplate()}
       </div>
     </div>
   `;
@@ -606,6 +618,20 @@ function cashierContactTemplate() {
       <span>Telefonnummer</span>
       <strong>${state.settings.calculatorPhone || "-"}</strong>
       ${state.settings.calculatorComment ? `<span>Hinweis</span><p>${state.settings.calculatorComment}</p>` : ""}
+    </aside>
+  `;
+}
+
+function cashierStatusTemplate() {
+  const online = Boolean(printerStatus.online);
+  const label = printerStatus.label || (online ? "Drucker" : "Drucker Offline");
+  return `
+    <aside class="panel cashier-status-box ${online ? "online" : "offline"}">
+      <strong data-clock>${cashierDateTime()}</strong>
+      <span class="printer-state ${online ? "online" : "offline"}" data-printer-status>
+        <span class="printer-dot"></span>
+        ${label}
+      </span>
     </aside>
   `;
 }
@@ -1223,6 +1249,7 @@ function bindShell() {
   document.querySelector("[data-system-shutdown]")?.addEventListener("click", shutdownSystem);
 
   startClock();
+  startPrinterStatus();
 }
 
 function closeSystemMenu() {
@@ -1234,11 +1261,42 @@ function startClock() {
   clearInterval(clockTimer);
   const tick = () => {
     document.querySelectorAll("[data-clock]").forEach((element) => {
-      element.textContent = shortDateTime();
+      element.textContent = cashierDateTime();
     });
   };
   tick();
   clockTimer = setInterval(tick, 1000);
+}
+
+function startPrinterStatus() {
+  clearInterval(printerStatusTimer);
+  refreshPrinterStatus();
+  printerStatusTimer = setInterval(refreshPrinterStatus, 10000);
+}
+
+async function refreshPrinterStatus() {
+  try {
+    const response = await fetch(`/api/print/status?t=${Date.now()}`, { cache: "no-store" });
+    if (!response.ok) throw new Error("Status nicht verfügbar");
+    const payload = await response.json();
+    printerStatus = { ...printerStatus, ...(payload.status || {}) };
+  } catch (error) {
+    printerStatus = { ...printerStatus, online: false, label: "Drucker Offline" };
+  }
+  updatePrinterStatusDisplay();
+}
+
+function updatePrinterStatusDisplay() {
+  const statusElement = document.querySelector("[data-printer-status]");
+  const box = document.querySelector(".cashier-status-box");
+  if (!statusElement || !box) return;
+  const online = Boolean(printerStatus.online);
+  const label = printerStatus.label || (online ? "Drucker" : "Drucker Offline");
+  statusElement.classList.toggle("online", online);
+  statusElement.classList.toggle("offline", !online);
+  box.classList.toggle("online", online);
+  box.classList.toggle("offline", !online);
+  statusElement.innerHTML = `<span class="printer-dot"></span>${label}`;
 }
 
 function bindCashier() {
@@ -1674,7 +1732,7 @@ async function saveSettings(section = "settings", button = getAdminSaveButton(se
     if (form.has("calculatorPhone")) state.settings.calculatorPhone = String(form.get("calculatorPhone")).trim();
     if (form.has("calculatorComment")) state.settings.calculatorComment = String(form.get("calculatorComment")).trim().slice(0, 400);
     if (form.has("printerMode")) state.settings.printerMode = String(form.get("printerMode") || "browser");
-    if (form.has("printerPort")) state.settings.printerPort = String(form.get("printerPort") || "").trim();
+    if (form.has("printerPort")) state.settings.printerPort = String(form.get("printerPort") || "/dev/ttyUSB0").trim();
     if (form.has("printOutputDir")) state.settings.printOutputDir = String(form.get("printOutputDir") || "data/prints").trim() || "data/prints";
     const logo = form.get("logo");
     if (logo && logo.size) {

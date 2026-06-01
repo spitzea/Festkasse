@@ -393,6 +393,22 @@ async function printReportSerial(report, settings) {
   await writeSerialPrinter(escposPrintJob(formatReportText(report, settings)), settings);
 }
 
+async function printerStatus(settings) {
+  const mode = settings.printerMode || "browser";
+  if (mode !== "serial") {
+    return { mode, online: true, label: mode === "textfile" ? "Textdatei" : "Browserdruck" };
+  }
+
+  const portPath = String(settings.printerPort || defaultSerialPrinterPort).trim() || defaultSerialPrinterPort;
+  try {
+    loadSerialPort();
+    await fsp.access(portPath, fs.constants.R_OK | fs.constants.W_OK);
+    return { mode, online: true, label: "Drucker", port: portPath };
+  } catch (error) {
+    return { mode, online: false, label: "Drucker Offline", port: portPath, error: error.message || "nicht erreichbar" };
+  }
+}
+
 async function writeReceiptTextFiles(receipts, settings) {
   const outputDir = resolvePrintOutputDir(settings.printOutputDir);
   await fsp.mkdir(outputDir, { recursive: true });
@@ -726,6 +742,12 @@ async function handleApi(req, res, urlPath) {
     delete user.password;
     await writeJson(activePath, state);
     sendJson(res, 200, { user: sanitizeState({ users: [user] }).users[0], system: systemInfo(state) });
+    return;
+  }
+
+  if (req.method === "GET" && urlPath === "/api/print/status") {
+    const state = await readJson(activePath);
+    sendJson(res, 200, { status: await printerStatus(state.settings || {}) });
     return;
   }
 
