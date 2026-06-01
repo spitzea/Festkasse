@@ -67,6 +67,15 @@ git pull
 npm install
 ```
 
+Wenn lokale Testdaten oder Konfigurationsaenderungen ein Update blockieren und die neueste GitHub-Version bewusst uebernommen werden soll:
+
+```bash
+cd ~/Festkasse
+bash scripts/pi-force-update.sh
+```
+
+Das Script stoppt den Service, sichert vorher `data/fest.json` nach `~/Festkasse-backups`, setzt das Repo auf `origin/main` zurueck, installiert die npm-Pakete und startet den Service neu.
+
 ## Thermodrucker per USB-RS232
 
 Getestete Konfiguration:
@@ -96,7 +105,7 @@ In der Festkasse unter **Admin -> Drucken**:
 - Druckmodus: `Serieller Thermodrucker`
 - Drucker-Port: `/dev/ttyUSB0`
 - Speichern
-- `Testbon drucken`
+- `Testbon schreiben`
 
 ## Festkasse-Service
 

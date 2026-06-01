@@ -992,7 +992,6 @@ function repositoryLinkTemplate() {
 }
 
 function printSettingsTemplate() {
-  const isSerialMode = state.settings.printerMode === "serial";
   return `
     <section class="panel">
       <div class="panel-header">
@@ -1010,8 +1009,8 @@ function printSettingsTemplate() {
           <label>Druckmodus</label>
           <select name="printerMode">
             <option value="browser" ${state.settings.printerMode === "browser" ? "selected" : ""}>Browserdruck</option>
-            <option value="textfile" ${state.settings.printerMode === "textfile" ? "selected" : ""}>Textdatei-Testdruck</option>
             <option value="serial" ${state.settings.printerMode === "serial" ? "selected" : ""}>Serieller Thermodrucker</option>
+            <option value="textfile" ${state.settings.printerMode === "textfile" ? "selected" : ""}>Textdatei-Testdruck</option>
           </select>
         </div>
         <div class="field">
@@ -1019,11 +1018,11 @@ function printSettingsTemplate() {
           <input name="printerPort" value="${state.settings.printerPort || "/dev/ttyUSB0"}" placeholder="/dev/ttyUSB0" />
         </div>
         <div class="field">
-          <label>Testdruck-Verzeichnis</label>
+          <label>Textdatei-Verzeichnis</label>
           <input name="printOutputDir" value="${state.settings.printOutputDir || "data/prints"}" />
         </div>
         <div class="field settings-test-print">
-          <button class="action-button" type="button" data-test-print>${isSerialMode ? "Testbon drucken" : "Testbon als TXT schreiben"}</button>
+          <button class="action-button" type="button" data-test-print>Testbon schreiben</button>
         </div>
       </form>
     </section>
@@ -1344,13 +1343,7 @@ function bindAdmin() {
   document.querySelectorAll("[data-settings-form]").forEach((formElement) => {
     const section = formElement.dataset.settingsSection || activeAdminSection;
     formElement.addEventListener("input", () => markAdminDirty(section));
-    formElement.addEventListener("change", (event) => {
-      markAdminDirty(section);
-      if (event.target?.name === "printerMode") {
-        const testButton = document.querySelector("[data-test-print]");
-        if (testButton) testButton.textContent = event.target.value === "serial" ? "Testbon drucken" : "Testbon als TXT schreiben";
-      }
-    });
+    formElement.addEventListener("change", () => markAdminDirty(section));
     formElement.addEventListener("submit", (event) => {
       event.preventDefault();
       saveSettings(section, event.submitter);
