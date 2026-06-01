@@ -897,10 +897,6 @@ textarea:focus-visible {
   overflow-wrap: anywhere;
 }
 
-.info-table a {
-  color: var(--amber);
-}
-
 .event-list {
   display: grid;
   gap: var(--space-sm);

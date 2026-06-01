@@ -84,6 +84,7 @@ let versionCheck = { status: "unchecked", label: "nicht geprüft" };
 let lastCheckout = null;
 let undoCheckoutTimer = null;
 let systemInfoRefreshPending = false;
+let versionCheckStarted = false;
 
 async function loadState() {
   const response = await fetch("/api/state");
@@ -638,6 +639,10 @@ function renderAdmin() {
       }
     });
   }
+  if (activeAdminSection === "info" && !versionCheckStarted) {
+    versionCheckStarted = true;
+    window.setTimeout(checkOnlineVersion, 0);
+  }
   const root = document.querySelector("[data-view-root]");
   const adminTemplates = {
     analysis: analysisTemplate,
@@ -983,7 +988,7 @@ function infoTemplate() {
 
 function repositoryLinkTemplate() {
   const url = displayValue(systemInfo.repositoryUrl, "");
-  return url ? `<a href="${url}" target="_blank" rel="noreferrer">${url}</a>` : "nicht verfügbar";
+  return url || "nicht verfügbar";
 }
 
 function printSettingsTemplate() {
@@ -1522,7 +1527,7 @@ async function checkOnlineVersion() {
     if (!payload.ok) {
       versionCheck = {
         status: "unavailable",
-        label: `nicht geprüft (${payload.error || "keine Verbindung"})`
+        label: `nicht verfügbar (${payload.error || "keine Verbindung oder privates Repository"})`
       };
     } else if (payload.updateAvailable) {
       versionCheck = {
@@ -1536,7 +1541,7 @@ async function checkOnlineVersion() {
       };
     }
   } catch (error) {
-    versionCheck = { status: "unavailable", label: "nicht geprüft (keine Verbindung)" };
+    versionCheck = { status: "unavailable", label: "nicht verfügbar (keine Verbindung oder privates Repository)" };
   }
   renderAdmin();
 }
