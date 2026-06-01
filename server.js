@@ -73,8 +73,8 @@ const defaultState = {
     eventName: "<Festname>",
     currency: "EUR",
     defaultWarningStock: 5,
-    printerName: "Browserdruck",
-    printerMode: "browser",
+    printerName: "Serieller Thermodrucker",
+    printerMode: "serial",
     printerPort: defaultSerialPrinterPort,
     printOutputDir: "data/prints",
     receiptFooter: "Vielen Dank!",
@@ -372,39 +372,30 @@ function toPrinterText(text) {
 }
 
 function encodePrinterText(text) {
-  const windows1252 = {
-    "\u20ac": 0x80,
-    "\u201e": 0x84,
-    "\u2026": 0x85,
-    "\u2020": 0x86,
-    "\u2021": 0x87,
-    "\u02c6": 0x88,
-    "\u2030": 0x89,
-    "\u0160": 0x8a,
-    "\u2039": 0x8b,
-    "\u0152": 0x8c,
-    "\u017d": 0x8e,
-    "\u2018": 0x91,
-    "\u2019": 0x92,
-    "\u201c": 0x93,
-    "\u201d": 0x94,
-    "\u2022": 0x95,
-    "\u2013": 0x96,
-    "\u2014": 0x97,
-    "\u02dc": 0x98,
-    "\u2122": 0x99,
-    "\u0161": 0x9a,
-    "\u203a": 0x9b,
-    "\u0153": 0x9c,
-    "\u017e": 0x9e,
-    "\u0178": 0x9f
+  const cp858 = {
+    "\u00c4": 0x8e,
+    "\u00d6": 0x99,
+    "\u00dc": 0x9a,
+    "\u00df": 0xe1,
+    "\u00e4": 0x84,
+    "\u00f6": 0x94,
+    "\u00fc": 0x81,
+    "\u00e9": 0x82,
+    "\u00e8": 0x8a,
+    "\u00e1": 0xa0,
+    "\u00e0": 0x85,
+    "\u00f1": 0xa4,
+    "\u00d1": 0xa5,
+    "\u00b0": 0xf8,
+    "\u00b5": 0xe6,
+    "\u20ac": 0xd5
   };
   const bytes = [];
   for (const char of toPrinterText(text)) {
     const code = char.charCodeAt(0);
-    if (windows1252[char]) {
-      bytes.push(windows1252[char]);
-    } else if (code <= 0xff) {
+    if (cp858[char]) {
+      bytes.push(cp858[char]);
+    } else if (code <= 0x7f) {
       bytes.push(code);
     } else {
       bytes.push(0x3f);
@@ -416,7 +407,7 @@ function encodePrinterText(text) {
 function escposPrintJob(text) {
   return Buffer.concat([
     Buffer.from([0x1b, 0x40]),
-    Buffer.from([0x1b, 0x74, 0x10]),
+    Buffer.from([0x1b, 0x74, 0x13]),
     encodePrinterText(text),
     Buffer.from([0x1d, 0x56, 0x01])
   ]);
@@ -433,7 +424,7 @@ function escposReceiptJob(receipt, settings) {
   const articleLines = wrapText(receipt.articleName || "Artikel", width).map((line) => `${centerText(line, width)}\r\n`);
   const chunks = [
     Buffer.from([0x1b, 0x40]),
-    Buffer.from([0x1b, 0x74, 0x10]),
+    Buffer.from([0x1b, 0x74, 0x13]),
     Buffer.from([0x1b, 0x61, 0x01]),
     escposText(`${settings.eventName || "Festkasse"}\r\n`),
     escposText(`${settings.clubName || ""}\r\n`),
@@ -453,7 +444,8 @@ function escposReceiptJob(receipt, settings) {
 
   chunks.push(
     escposText(`\r\n${"-".repeat(width)}\r\n`),
-    escposText(`Bon #${receiptNumber}  ${receiptDateTimeText(time)}\r\n\r\n\r\n`),
+    escposText(`Bon #${receiptNumber}  ${receiptDateTimeText(time)}\r\n`),
+    Buffer.from([0x1b, 0x64, 0x03]),
     Buffer.from([0x1d, 0x56, 0x01])
   );
   return Buffer.concat(chunks);

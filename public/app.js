@@ -5,27 +5,14 @@ const DEFAULT_RESET_STOCK = 500;
 const MAX_CATEGORIES = 5;
 const SESSION_STORAGE_KEY = "festkasseSessionUser";
 const LAST_RECEIPT_UNDO_MS = 30000;
+const THEME_STORAGE_KEY = "festkasseTheme";
 
 const seedData = {
   users: [
     { id: "usr_kasse", username: "kasse", role: "user", active: true },
     { id: "usr_admin", username: "admin", role: "admin", active: true }
   ],
-  articles: [
-    { id: "art_001", name: "Paprikaschnitzel mit Pommes", price: 12, stock: 500, warningStock: 5, category: "Schnitzel", categoryColor: "#e32626", active: true },
-    { id: "art_002", name: "Rahmschnitzel mit Pommes", price: 12, stock: 500, warningStock: 5, category: "Schnitzel", categoryColor: "#e32626", active: true },
-    { id: "art_003", name: "Kochkäseschnitzel mit Brot", price: 12, stock: 500, warningStock: 5, category: "Schnitzel", categoryColor: "#e32626", active: true },
-    { id: "art_004", name: "Hackbraten mit Soße und Brot", price: 8.5, stock: 500, warningStock: 5, category: "Küche", categoryColor: "#f97316", active: true },
-    { id: "art_005", name: "Bratwurst mit Brötchen/Brot", price: 4, stock: 500, warningStock: 5, category: "Wurst", categoryColor: "#ffb703", active: true },
-    { id: "art_006", name: "Rindswurst mit Brötchen/Brot", price: 4, stock: 500, warningStock: 5, category: "Wurst", categoryColor: "#ffb703", active: true },
-    { id: "art_007", name: "Pommes", price: 3, stock: 500, warningStock: 10, category: "Beilagen", categoryColor: "#22c55e", active: true },
-    { id: "art_008", name: "Kochkäse mit Brot", price: 4, stock: 500, warningStock: 5, category: "Beilagen", categoryColor: "#22c55e", active: true },
-    { id: "art_009", name: "Pinsa Salami", price: 8.5, stock: 500, warningStock: 5, category: "Pinsa", categoryColor: "#8b5cf6", active: true },
-    { id: "art_010", name: "Pinsa vegetarisch", price: 8.5, stock: 500, warningStock: 5, category: "Pinsa", categoryColor: "#8b5cf6", active: true },
-    { id: "art_011", name: "Feta Grillpfännchen", price: 6, stock: 500, warningStock: 5, category: "Beilagen", categoryColor: "#22c55e", active: true },
-    { id: "art_012", name: "Currywurst", price: 4.5, stock: 500, warningStock: 5, category: "Wurst", categoryColor: "#ffb703", active: true },
-    { id: "art_013", name: "Schwedensalat", price: 2, stock: 500, warningStock: 5, category: "Beilagen", categoryColor: "#22c55e", active: true }
-  ],
+  articles: [],
   orders: [],
   cancellations: [],
   dayReports: [],
@@ -34,8 +21,8 @@ const seedData = {
     eventName: "<Festname>",
     currency: "EUR",
     defaultWarningStock: 5,
-    printerName: "Browserdruck",
-    printerMode: "browser",
+    printerName: "Serieller Thermodrucker",
+    printerMode: "serial",
     printerPort: "/dev/ttyUSB0",
     printOutputDir: "data/prints",
     receiptFooter: "Vielen Dank!",
@@ -46,13 +33,7 @@ const seedData = {
     menuVersion: 5,
     activeEventFile: "fest.json",
     nextReceiptNumber: 1,
-    categories: [
-      { name: "Schnitzel", color: "#e32626" },
-      { name: "Küche", color: "#f97316" },
-      { name: "Wurst", color: "#ffb703" },
-      { name: "Beilagen", color: "#22c55e" },
-      { name: "Pinsa", color: "#8b5cf6" }
-    ]
+    categories: []
   }
 };
 
@@ -87,6 +68,39 @@ let systemInfoRefreshPending = false;
 let versionCheckStarted = false;
 let printerStatus = { online: false, label: "Drucker Offline", mode: "browser" };
 let printerStatusTimer = null;
+let themeMode = normalizeThemeMode(window.localStorage.getItem(THEME_STORAGE_KEY));
+let themeMediaQuery = null;
+
+function normalizeThemeMode(mode) {
+  return ["auto", "light", "dark"].includes(mode) ? mode : "auto";
+}
+
+function resolvedTheme(mode = themeMode) {
+  if (mode === "auto") {
+    return window.matchMedia?.("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+  }
+  return mode;
+}
+
+function applyTheme(mode = themeMode) {
+  themeMode = normalizeThemeMode(mode);
+  document.documentElement.dataset.themeMode = themeMode;
+  document.documentElement.dataset.theme = resolvedTheme(themeMode);
+}
+
+function setThemeMode(mode) {
+  applyTheme(mode);
+  window.localStorage.setItem(THEME_STORAGE_KEY, themeMode);
+}
+
+function bindThemeAutoUpdates() {
+  themeMediaQuery = window.matchMedia?.("(prefers-color-scheme: dark)");
+  themeMediaQuery?.addEventListener?.("change", () => {
+    if (themeMode === "auto") applyTheme("auto");
+  });
+}
+
+applyTheme(themeMode);
 
 async function loadState() {
   const response = await fetch("/api/state");
@@ -134,14 +148,6 @@ function normalizeState(data) {
   normalized.cancellations ||= [];
   normalized.dayReports ||= [];
   normalized.settings.nextReceiptNumber = Math.max(1, Number(normalized.settings.nextReceiptNumber) || 1);
-  const menuVersion = Number(normalized.settings.menuVersion || 0);
-  if (menuVersion < 3) {
-    normalized.articles = cloneData(seedData.articles);
-    normalized.settings.categories = cloneData(seedData.settings.categories);
-  }
-  if (menuVersion < 4) {
-    applyArticleNameCleanup(normalized.articles);
-  }
   normalized.settings.menuVersion = 5;
   normalized.settings.activeEventFile ||= "fest.json";
   normalized.articles = normalized.articles.map((article, index) => ({
@@ -149,20 +155,6 @@ function normalizeState(data) {
     sortOrder: Number.isFinite(Number(article.sortOrder)) ? Number(article.sortOrder) : index + 1
   })).sort((a, b) => a.sortOrder - b.sortOrder || a.name.localeCompare(b.name, "de"));
   return normalized;
-}
-
-function applyArticleNameCleanup(articles) {
-  const cleanNames = {
-    art_005: "Bratwurst mit Brötchen/Brot",
-    art_006: "Rindswurst mit Brötchen/Brot",
-    art_008: "Kochkäse mit Brot"
-  };
-
-  articles.forEach((article) => {
-    if (cleanNames[article.id]) {
-      article.name = cleanNames[article.id];
-    }
-  });
 }
 
 function normalizeCategories(categories, articles) {
@@ -444,6 +436,7 @@ function shellTemplate() {
                 <button class="tab-button ${activeView === "admin" && activeAdminSection === "info" ? "active" : ""}" type="button" data-admin-section="info">Info</button>
                 ${canManage() ? adminMenuTemplate() : ""}
               </nav>
+              ${themeMenuTemplate()}
               ${canShutdownSystem() ? `<button class="danger-button small-button" type="button" data-system-shutdown>Herunterfahren</button>` : ""}
               <button class="action-button small-button menu-logout-button" type="button" data-logout>Logout</button>
             </div>
@@ -486,6 +479,24 @@ function adminMenuTemplate() {
     ${items.map(([section, label]) => `
       <button class="ghost-button small-button ${activeView === "admin" && activeAdminSection === section ? "active" : ""}" type="button" data-admin-section="${section}">${label}</button>
     `).join("")}
+  `;
+}
+
+function themeMenuTemplate() {
+  const options = [
+    ["auto", "Auto"],
+    ["light", "Hell"],
+    ["dark", "Dunkel"]
+  ];
+  return `
+    <div class="theme-menu" role="group" aria-label="Designmodus">
+      <span class="menu-section-title">Design</span>
+      <div class="theme-options">
+        ${options.map(([value, label]) => `
+          <button class="ghost-button small-button ${themeMode === value ? "active" : ""}" type="button" data-theme-mode="${value}">${label}</button>
+        `).join("")}
+      </div>
+    </div>
   `;
 }
 
@@ -1238,6 +1249,13 @@ function bindShell() {
     button.addEventListener("click", () => {
       activeView = "admin";
       activeAdminSection = button.dataset.adminSection;
+      render();
+    });
+  });
+
+  document.querySelectorAll("[data-theme-mode]").forEach((button) => {
+    button.addEventListener("click", () => {
+      setThemeMode(button.dataset.themeMode);
       render();
     });
   });
@@ -2366,6 +2384,7 @@ async function softRefreshApp() {
 }
 
 async function init() {
+  bindThemeAutoUpdates();
   try {
     state = await loadState();
     restoreSessionUser();

@@ -5,6 +5,14 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Festkasse Community Edition</title>
     <link id="dynamic-favicon" rel="icon" href="data:," />
+    <script>
+      (() => {
+        const mode = localStorage.getItem("festkasseTheme") || "auto";
+        const systemDark = window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches;
+        document.documentElement.dataset.themeMode = mode;
+        document.documentElement.dataset.theme = mode === "auto" ? (systemDark ? "dark" : "light") : mode;
+      })();
+    </script>
     <link rel="stylesheet" href="styles.css" />
   </head>
   <body>
