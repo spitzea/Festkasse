@@ -318,7 +318,7 @@ textarea:focus-visible {
 
 .layout {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(21rem, 25rem);
+  grid-template-columns: minmax(0, 72fr) minmax(23rem, 28fr);
   gap: 0.75rem;
   padding: 0.75rem clamp(0.75rem, 2vw, 1.4rem) 1rem;
 }
@@ -422,14 +422,14 @@ textarea:focus-visible {
 
 .category-heading h3 {
   margin: 0;
-  font-size: 1rem;
+  font-size: 1.14rem;
   text-transform: uppercase;
   letter-spacing: 0;
 }
 
 .category-dot {
-  width: 1rem;
-  height: 1rem;
+  width: 1.1rem;
+  height: 1.1rem;
   border-radius: var(--radius-pill);
   background: color-mix(in srgb, var(--category-color) 72%, #fff);
 }
@@ -1306,7 +1306,7 @@ textarea:focus-visible {
   }
 
   .layout {
-    grid-template-columns: minmax(0, 1fr) minmax(18rem, 22rem);
+    grid-template-columns: minmax(0, 72fr) minmax(20rem, 28fr);
     gap: 0.65rem;
     padding: 0.65rem;
   }
@@ -1329,7 +1329,7 @@ textarea:focus-visible {
   }
 
   .category-heading h3 {
-    font-size: 0.88rem;
+    font-size: 1rem;
   }
 
   .article-grid {
