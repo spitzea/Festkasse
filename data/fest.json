@@ -5,16 +5,16 @@
       "username": "kasse",
       "role": "user",
       "active": true,
-      "passwordSalt": "ee502d6b5e335c0c2dff94c2b8d7ad47",
-      "passwordHash": "3ab091a94102e9b28be0ccea2cd465553b69a26d08b4c711f73411812293b253"
+      "passwordSalt": "default-kasse",
+      "passwordHash": "80f7c7004e02d83a00b6b179409fc6736c0335277eddd0f6234b81dc14418d31"
     },
     {
       "id": "usr_admin",
       "username": "admin",
       "role": "admin",
       "active": true,
-      "passwordSalt": "bea63e7744a8739b67731c9641934f58",
-      "passwordHash": "e7a4d7cb40bfce741ad5e269f4bc4afaad8376618b68713d6cde67b8d69ce540"
+      "passwordSalt": "default-admin",
+      "passwordHash": "48451a874317ae58ad068ea737fd3fbb1a9689958087047794809a74bbc5ff79"
     }
   ],
   "articles": [
