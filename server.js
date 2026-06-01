@@ -6,6 +6,7 @@ const fs = require("fs");
 const fsp = require("fs/promises");
 const path = require("path");
 const crypto = require("crypto");
+const https = require("https");
 const { execFile, execFileSync } = require("child_process");
 
 const port = process.env.PORT || 3000;
@@ -17,6 +18,7 @@ const printsDir = path.join(dataDir, "prints");
 const defaultsPath = path.join(dataDir, "defaults.json");
 const activePath = path.join(dataDir, "fest.json");
 const packagePath = path.join(__dirname, "package.json");
+const latestVersionUrl = process.env.FESTKASSE_LATEST_VERSION_URL || "https://raw.githubusercontent.com/spitzea/Festkasse/main/package.json";
 
 const contentTypes = {
   ".html": "text/html; charset=utf-8",
@@ -66,8 +68,8 @@ const defaultState = {
   cancellations: [],
   dayReports: [],
   settings: {
-    clubName: "Musterverein e.V.",
-    eventName: "Sommerfest",
+    clubName: "<Organisation>",
+    eventName: "<Festname>",
     currency: "EUR",
     defaultWarningStock: 5,
     printerName: "Browserdruck",
@@ -81,6 +83,7 @@ const defaultState = {
     calculatorComment: "",
     menuVersion: 5,
     activeEventFile: "fest.json",
+    nextReceiptNumber: 1,
     categories: [
       { name: "Schnitzel", color: "#e32626" },
       { name: "Küche", color: "#f97316" },
@@ -121,6 +124,25 @@ function sanitizeState(state) {
     ...state,
     users: (state.users || []).map(({ passwordHash, passwordSalt, password, ...user }) => user)
   };
+}
+
+function hasDefaultPassword(user) {
+  const defaults = {
+    kasse: {
+      passwordSalt: "default-kasse",
+      passwordHash: "80f7c7004e02d83a00b6b179409fc6736c0335277eddd0f6234b81dc14418d31"
+    },
+    admin: {
+      passwordSalt: "default-admin",
+      passwordHash: "48451a874317ae58ad068ea737fd3fbb1a9689958087047794809a74bbc5ff79"
+    }
+  };
+  const expected = defaults[user?.username];
+  return Boolean(expected && user.passwordSalt === expected.passwordSalt && user.passwordHash === expected.passwordHash);
+}
+
+function hasAnyDefaultPassword(state) {
+  return (state.users || []).some(hasDefaultPassword);
 }
 
 function mergeIncomingState(current, incoming) {
@@ -180,7 +202,8 @@ function createTemplateState(source, eventName = source.settings?.eventName || "
     settings: {
       ...(source.settings || {}),
       eventName,
-      activeEventFile: "fest.json"
+      activeEventFile: "fest.json",
+      nextReceiptNumber: 1
     }
   };
 }
@@ -237,6 +260,7 @@ function moneyText(value, currency = "EUR") {
 function formatReceiptText(receipt, settings) {
   const width = 42;
   const time = receipt.createdAt ? new Date(receipt.createdAt) : new Date();
+  const receiptNumber = formatReceiptNumber(receipt.receiptNumber);
   const lines = [
     settings.eventName || "Festkasse",
     settings.clubName || "",
@@ -252,16 +276,20 @@ function formatReceiptText(receipt, settings) {
   lines.push(
     "",
     "-".repeat(width),
-    time.toLocaleDateString("de-DE"),
-    time.toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" })
+    `Bon #${receiptNumber}  ${time.toLocaleDateString("de-DE")} ${time.toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" })}`
   );
 
   if (receipt.isFree) {
-    lines.push("Freibon");
+    lines.push("Kostenlos");
   }
 
   lines.push("", "");
   return `${lines.filter((line) => line !== null && line !== undefined).join("\n")}\n`;
+}
+
+function formatReceiptNumber(value) {
+  const number = Math.max(0, Number(value) || 0);
+  return String(number).padStart(6, "0");
 }
 
 function formatReportText(report, settings) {
@@ -307,7 +335,7 @@ async function writeReceiptTextFiles(receipts, settings) {
 
   const files = [];
   for (const receipt of receipts) {
-    const fileName = safePrintFileName(receipt.isFree ? "freibon" : "bon");
+    const fileName = safePrintFileName(receipt.isFree ? "kostenlos" : "bon");
     const filePath = path.join(outputDir, fileName);
     await fsp.writeFile(filePath, formatReceiptText(receipt, settings), "utf8");
     files.push(filePath);
@@ -374,10 +402,26 @@ function sendError(res, error) {
 
 function readPackageVersion() {
   try {
-    return JSON.parse(fs.readFileSync(packagePath, "utf8")).version || "unknown";
+    return readPackageMeta().version || process.env.npm_package_version || "unknown";
   } catch (error) {
-    return "unknown";
+    return process.env.npm_package_version || "unknown";
   }
+}
+
+function readPackageMeta() {
+  try {
+    return JSON.parse(fs.readFileSync(packagePath, "utf8"));
+  } catch (error) {
+    return {};
+  }
+}
+
+function repositoryUrl(packageMeta) {
+  const rawRepository = packageMeta.repository;
+  const url = typeof rawRepository === "string" ? rawRepository : rawRepository?.url;
+  return String(url || "")
+    .replace(/^git\+/, "")
+    .replace(/\.git$/, "");
 }
 
 function readGitCommit() {
@@ -392,12 +436,81 @@ function readGitCommit() {
   }
 }
 
-function systemInfo() {
+function systemInfo(state = {}) {
+  const packageMeta = readPackageMeta();
   return {
     platform: process.platform,
     canShutdown: process.platform === "linux",
     appVersion: readPackageVersion(),
-    gitCommit: readGitCommit()
+    gitCommit: readGitCommit(),
+    nodeVersion: process.version,
+    license: packageMeta.license || "MIT",
+    copyright: "Copyright (c) Andreas Spitzenberg",
+    repositoryUrl: repositoryUrl(packageMeta),
+    serverTime: new Date().toISOString(),
+    defaultPasswordsActive: hasAnyDefaultPassword(state)
+  };
+}
+
+function compareVersions(current, latest) {
+  const currentParts = String(current || "0").split(".").map((part) => Number(part) || 0);
+  const latestParts = String(latest || "0").split(".").map((part) => Number(part) || 0);
+  const length = Math.max(currentParts.length, latestParts.length);
+  for (let index = 0; index < length; index += 1) {
+    const left = currentParts[index] || 0;
+    const right = latestParts[index] || 0;
+    if (left < right) return -1;
+    if (left > right) return 1;
+  }
+  return 0;
+}
+
+function fetchJson(url, timeoutMs = 3000) {
+  return new Promise((resolve, reject) => {
+    const request = https.get(url, {
+      headers: {
+        "Accept": "application/json",
+        "User-Agent": "Festkasse-Community"
+      },
+      timeout: timeoutMs
+    }, (response) => {
+      let body = "";
+      response.setEncoding("utf8");
+      response.on("data", (chunk) => {
+        body += chunk;
+        if (body.length > 1024 * 1024) {
+          request.destroy(new Error("Antwort zu groß."));
+        }
+      });
+      response.on("end", () => {
+        if (response.statusCode < 200 || response.statusCode >= 300) {
+          reject(new Error(`HTTP ${response.statusCode}`));
+          return;
+        }
+        try {
+          resolve(JSON.parse(body));
+        } catch (error) {
+          reject(error);
+        }
+      });
+    });
+    request.on("timeout", () => request.destroy(new Error("Timeout")));
+    request.on("error", reject);
+  });
+}
+
+async function checkLatestVersion() {
+  const currentVersion = readPackageVersion();
+  const latestPackage = await fetchJson(latestVersionUrl);
+  const latestVersion = latestPackage.version || "unknown";
+  const comparison = compareVersions(currentVersion, latestVersion);
+  return {
+    ok: true,
+    currentVersion,
+    latestVersion,
+    isLatest: comparison >= 0,
+    updateAvailable: comparison < 0,
+    source: latestVersionUrl
   };
 }
 
@@ -414,9 +527,31 @@ function shutdownSystem() {
 }
 
 async function handleApi(req, res, urlPath) {
+  if (req.method === "GET" && urlPath === "/api/system") {
+    const state = await readJson(activePath);
+    sendJson(res, 200, { system: systemInfo(state) });
+    return;
+  }
+
+  if (req.method === "GET" && urlPath === "/api/version-check") {
+    try {
+      sendJson(res, 200, await checkLatestVersion());
+    } catch (error) {
+      sendJson(res, 200, {
+        ok: false,
+        currentVersion: readPackageVersion(),
+        latestVersion: "unknown",
+        isLatest: null,
+        updateAvailable: false,
+        error: "Online-Version konnte nicht geprüft werden."
+      });
+    }
+    return;
+  }
+
   if (req.method === "GET" && urlPath === "/api/state") {
     const state = await readJson(activePath);
-    sendJson(res, 200, { state: sanitizeState(state), system: systemInfo() });
+    sendJson(res, 200, { state: sanitizeState(state), system: systemInfo(state) });
     return;
   }
 
@@ -426,7 +561,7 @@ async function handleApi(req, res, urlPath) {
     const nextState = mergeIncomingState(current, body.state || {});
     nextState.settings = { ...(nextState.settings || {}), updatedAt: new Date().toISOString() };
     await writeJson(activePath, nextState);
-    sendJson(res, 200, { state: sanitizeState(nextState) });
+    sendJson(res, 200, { state: sanitizeState(nextState), system: systemInfo(nextState) });
     return;
   }
 
@@ -483,7 +618,7 @@ async function handleApi(req, res, urlPath) {
       }
     };
     await writeJson(path.join(eventsDir, fileName), savedState);
-    sendJson(res, 200, { file: fileName, state: sanitizeState(active) });
+    sendJson(res, 200, { file: fileName, state: sanitizeState(active), system: systemInfo(active) });
     return;
   }
 
@@ -494,7 +629,7 @@ async function handleApi(req, res, urlPath) {
       ? createTemplateState(source, body.eventName || source.settings?.eventName)
       : { ...source, settings: { ...(source.settings || {}), activeEventFile: "fest.json" } };
     await writeJson(activePath, nextState);
-    sendJson(res, 200, { state: sanitizeState(nextState) });
+    sendJson(res, 200, { state: sanitizeState(nextState), system: systemInfo(nextState) });
     return;
   }
 
@@ -503,7 +638,7 @@ async function handleApi(req, res, urlPath) {
     const source = body.file ? await readJson(resolveManagedFile(body.file)) : await readJson(defaultsPath);
     const nextState = createTemplateState(source, body.eventName || "Neues Fest");
     await writeJson(activePath, nextState);
-    sendJson(res, 200, { state: sanitizeState(nextState) });
+    sendJson(res, 200, { state: sanitizeState(nextState), system: systemInfo(nextState) });
     return;
   }
 
@@ -526,7 +661,7 @@ async function handleApi(req, res, urlPath) {
     Object.assign(user, createPasswordRecord(body.password || ""));
     delete user.password;
     await writeJson(activePath, state);
-    sendJson(res, 200, { user: sanitizeState({ users: [user] }).users[0] });
+    sendJson(res, 200, { user: sanitizeState({ users: [user] }).users[0], system: systemInfo(state) });
     return;
   }
 
@@ -581,7 +716,8 @@ async function handleApi(req, res, urlPath) {
       articleName: "Testbon Festkasse",
       price: 1.23,
       isFree: false,
-      createdAt: new Date().toISOString()
+      createdAt: new Date().toISOString(),
+      receiptNumber: Number(state.settings?.nextReceiptNumber) || 1
     };
 
     if (mode === "textfile" || mode === "browser") {
@@ -633,14 +769,18 @@ function serveStatic(req, res) {
           return;
         }
 
-        res.writeHead(200, { "Content-Type": contentTypes[".html"] });
+        res.writeHead(200, { "Content-Type": contentTypes[".html"], "Cache-Control": "no-store" });
         res.end(fallbackContent);
       });
       return;
     }
 
     const extension = path.extname(filePath).toLowerCase();
-    res.writeHead(200, { "Content-Type": contentTypes[extension] || "application/octet-stream" });
+    const headers = { "Content-Type": contentTypes[extension] || "application/octet-stream" };
+    if ([".html", ".js", ".css"].includes(extension)) {
+      headers["Cache-Control"] = "no-store";
+    }
+    res.writeHead(200, headers);
     res.end(content);
   });
 }

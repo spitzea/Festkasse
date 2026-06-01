@@ -4,6 +4,7 @@
 const DEFAULT_RESET_STOCK = 500;
 const MAX_CATEGORIES = 5;
 const SESSION_STORAGE_KEY = "festkasseSessionUser";
+const LAST_RECEIPT_UNDO_MS = 30000;
 
 const seedData = {
   users: [
@@ -29,8 +30,8 @@ const seedData = {
   cancellations: [],
   dayReports: [],
   settings: {
-    clubName: "Musterverein e.V.",
-    eventName: "Sommerfest",
+    clubName: "<Organisation>",
+    eventName: "<Festname>",
     currency: "EUR",
     defaultWarningStock: 5,
     printerName: "Browserdruck",
@@ -44,6 +45,7 @@ const seedData = {
     calculatorComment: "",
     menuVersion: 5,
     activeEventFile: "fest.json",
+    nextReceiptNumber: 1,
     categories: [
       { name: "Schnitzel", color: "#e32626" },
       { name: "Küche", color: "#f97316" },
@@ -66,14 +68,48 @@ const adminDirtySections = new Set();
 const adminSavedSections = new Set();
 let eventCatalog = null;
 let bootError = "";
-let systemInfo = { platform: "unknown", canShutdown: false, appVersion: "unknown", gitCommit: "unknown" };
+let systemInfo = {
+  platform: "",
+  canShutdown: false,
+  appVersion: "",
+  gitCommit: "",
+  nodeVersion: "",
+  license: "",
+  copyright: "",
+  repositoryUrl: "",
+  serverTime: "",
+  defaultPasswordsActive: false
+};
+let versionCheck = { status: "unchecked", label: "nicht geprüft" };
+let lastCheckout = null;
+let undoCheckoutTimer = null;
+let systemInfoRefreshPending = false;
 
 async function loadState() {
   const response = await fetch("/api/state");
   if (!response.ok) throw new Error("Serverdaten konnten nicht geladen werden.");
   const payload = await response.json();
-  systemInfo = payload.system || systemInfo;
+  systemInfo = { ...systemInfo, ...(payload.system || {}) };
   return normalizeState(payload.state);
+}
+
+async function refreshSystemInfo() {
+  try {
+    const response = await fetch(`/api/system?t=${Date.now()}`, { cache: "no-store" });
+    if (!response.ok) return;
+    const payload = await response.json();
+    systemInfo = { ...systemInfo, ...(payload.system || {}) };
+  } catch (error) {
+    // Older servers do not provide /api/system. The UI keeps browser fallbacks in that case.
+  }
+}
+
+function needsSystemInfoRefresh() {
+  return ["appVersion", "gitCommit", "nodeVersion", "platform"].some((key) => !hasUsefulSystemValue(systemInfo[key]));
+}
+
+function hasUsefulSystemValue(value) {
+  return Boolean(value && value !== "unknown" && value !== "nicht verfügbar");
 }
 
 function cloneData(data) {
@@ -94,6 +130,7 @@ function normalizeState(data) {
   normalized.orders ||= [];
   normalized.cancellations ||= [];
   normalized.dayReports ||= [];
+  normalized.settings.nextReceiptNumber = Math.max(1, Number(normalized.settings.nextReceiptNumber) || 1);
   const menuVersion = Number(normalized.settings.menuVersion || 0);
   if (menuVersion < 3) {
     normalized.articles = cloneData(seedData.articles);
@@ -152,6 +189,7 @@ async function saveState() {
   }
   const payload = await response.json();
   state = normalizeState(payload.state);
+  systemInfo = { ...systemInfo, ...(payload.system || {}) };
   return true;
 }
 
@@ -210,10 +248,18 @@ function roleLabel(role) {
 }
 
 function systemVersionLabel() {
-  const version = systemInfo.appVersion || "unknown";
-  const commit = systemInfo.gitCommit || "unknown";
+  const version = displayValue(systemInfo.appVersion, "unknown");
+  const commit = displayValue(systemInfo.gitCommit, "unknown");
   if (version === "unknown" && commit === "unknown") return "nicht verfügbar";
   return `${version} (${commit})`;
+}
+
+function displayValue(value, fallback = "-") {
+  return value && value !== "unknown" ? value : fallback;
+}
+
+function formatReceiptNumber(value) {
+  return String(Math.max(0, Number(value) || 0)).padStart(6, "0");
 }
 
 function browserDisplayInfo() {
@@ -289,6 +335,7 @@ function clearSessionUser() {
 }
 
 function render() {
+  updateFavicon();
   const app = document.querySelector("#app");
   if (bootError) {
     app.innerHTML = `
@@ -319,6 +366,12 @@ function render() {
   }
 }
 
+function updateFavicon() {
+  const favicon = document.querySelector("#dynamic-favicon");
+  if (!favicon) return;
+  favicon.setAttribute("href", state.settings.logoDataUrl || "data:,");
+}
+
 function loginTemplate() {
   return `
     <main class="login-screen">
@@ -340,12 +393,7 @@ function loginTemplate() {
             <input id="password" name="password" type="password" autocomplete="current-password" required />
           </div>
           <button class="primary-button" type="submit">Einloggen</button>
-          <div class="login-access">
-            <strong>Standardzugänge</strong>
-            <span>Kasse: <code>kasse</code> / <code>kasse123</code></span>
-            <span>Admin: <code>admin</code> / <code>admin123</code></span>
-            <small>Nach einer Änderung gelten die im Adminbereich gesetzten Passwörter.</small>
-          </div>
+          ${systemInfo.defaultPasswordsActive === true ? defaultAccessTemplate() : ""}
           <div class="login-contact">
             <strong>Rechner: ${state.settings.calculatorName || "-"}</strong>
             <span>Telefonnummer: ${state.settings.calculatorPhone || "-"}</span>
@@ -371,6 +419,7 @@ function shellTemplate() {
           </div>
         </div>
         <div class="top-actions">
+          <span class="stock-pill top-clock" data-clock>${shortDateTime()}</span>
           <button class="tab-button ${activeView === "cashier" ? "active" : ""}" type="button" data-view="cashier">Kasse</button>
           <div class="system-menu">
             <button class="ghost-button menu-button" type="button" data-system-menu aria-label="Menü" aria-expanded="false">
@@ -397,6 +446,17 @@ function canShutdownSystem() {
   return Boolean(systemInfo.canShutdown);
 }
 
+function defaultAccessTemplate() {
+  return `
+    <div class="login-access">
+      <strong>Standardzugänge</strong>
+      <span>Kasse: <code>kasse</code> / <code>kasse123</code></span>
+      <span>Admin: <code>admin</code> / <code>admin123</code></span>
+      <small>Nach einer Änderung gelten die im Adminbereich gesetzten Passwörter.</small>
+    </div>
+  `;
+}
+
 function adminMenuTemplate() {
   const items = [
     ["analysis", "Tagesauswertung"],
@@ -420,7 +480,7 @@ function brandMarkTemplate() {
     return `<div class="brand-mark logo-mark"><img src="${state.settings.logoDataUrl}" alt="Logo" /></div>`;
   }
 
-  return `<div class="brand-mark">112</div>`;
+  return `<div class="brand-mark">Logo</div>`;
 }
 
 function renderCashier() {
@@ -435,19 +495,15 @@ function renderCashier() {
 
   root.innerHTML = `
     <div class="layout">
-      <section class="panel">
-        <div class="panel-header">
-          <div>
-            <h2>Artikel</h2>
-            <p>Antippen, kassieren, fertig.</p>
-          </div>
-          <span class="stock-pill" data-clock>${shortDateTime()}</span>
-        </div>
+      <section class="panel articles-panel">
         <div class="category-stack">
           ${Object.entries(groupedArticles).map(([category, articles]) => categoryGroupTemplate(category, articles)).join("")}
         </div>
       </section>
-      ${cartTemplate()}
+      <div class="cart-column">
+        ${cartTemplate()}
+        ${cashierContactTemplate()}
+      </div>
     </div>
   `;
   bindCashier();
@@ -483,9 +539,25 @@ function articleButtonTemplate(article) {
   `;
 }
 
+function canUndoLastCheckout() {
+  return Boolean(lastCheckout && Date.now() < lastCheckout.expiresAt);
+}
+
+function scheduleUndoCheckoutExpiry() {
+  window.clearTimeout(undoCheckoutTimer);
+  if (!lastCheckout) return;
+  undoCheckoutTimer = window.setTimeout(() => {
+    lastCheckout = null;
+    renderCart();
+  }, Math.max(0, lastCheckout.expiresAt - Date.now()));
+}
+
 function cartTemplate() {
   const total = cart.reduce((sum, item) => sum + item.unitPrice * item.quantity, 0);
   const change = Math.max(0, Number(paidAmount || 0) - total);
+  const undoButton = canUndoLastCheckout()
+    ? `<button class="ghost-button undo-button" type="button" data-undo-last-checkout>Storno letzter Bon</button>`
+    : "";
   const rows = cart.length
     ? cart.map(cartRowTemplate).join("")
     : `<div class="empty-state">Noch nichts im Korb. Gleich wird's heiß.</div>`;
@@ -499,6 +571,7 @@ function cartTemplate() {
         </div>
         ${cart.length ? `<button class="danger-button" data-cancel-cart>Warenkorb leeren</button>` : ""}
       </div>
+      ${undoButton}
       <div class="cart-body">
         ${rows}
         <div class="cart-total">
@@ -516,17 +589,22 @@ function cartTemplate() {
           </div>
           <div class="checkout-actions">
             <button class="primary-button" data-print-paid ${cart.length ? "" : "disabled"}>Bon drucken</button>
-            <button class="ghost-button" data-print-free ${cart.length ? "" : "disabled"}>Freibon buchen</button>
+            <button class="ghost-button" data-print-free ${cart.length ? "" : "disabled"}>Kostenlos buchen</button>
           </div>
         </div>
-        <section class="contact-box">
-          <span>Rechner</span>
-          <strong>${state.settings.calculatorName || "-"}</strong>
-          <span>Telefonnummer</span>
-          <strong>${state.settings.calculatorPhone || "-"}</strong>
-          ${state.settings.calculatorComment ? `<span>Hinweis</span><p>${state.settings.calculatorComment}</p>` : ""}
-        </section>
       </div>
+    </aside>
+  `;
+}
+
+function cashierContactTemplate() {
+  return `
+    <aside class="panel contact-box">
+      <span>Rechner</span>
+      <strong>${state.settings.calculatorName || "-"}</strong>
+      <span>Telefonnummer</span>
+      <strong>${state.settings.calculatorPhone || "-"}</strong>
+      ${state.settings.calculatorComment ? `<span>Hinweis</span><p>${state.settings.calculatorComment}</p>` : ""}
     </aside>
   `;
 }
@@ -551,6 +629,15 @@ function renderAdmin() {
   if (!canManage()) {
     activeAdminSection = "info";
   }
+  if (activeAdminSection === "info" && needsSystemInfoRefresh() && !systemInfoRefreshPending) {
+    systemInfoRefreshPending = true;
+    refreshSystemInfo().finally(() => {
+      systemInfoRefreshPending = false;
+      if (activeView === "admin" && activeAdminSection === "info") {
+        renderAdmin();
+      }
+    });
+  }
   const root = document.querySelector("[data-view-root]");
   const adminTemplates = {
     analysis: analysisTemplate,
@@ -566,13 +653,6 @@ function renderAdmin() {
 
   root.innerHTML = `
     <div class="admin-layout">
-      <section class="panel">
-        <div class="panel-header">
-          <div>
-            <h2>${canManage() ? "Admin" : "Info"}</h2>
-          </div>
-        </div>
-      </section>
       ${content}
     </div>
   `;
@@ -794,7 +874,7 @@ function settingsTemplate() {
       <div class="panel-header">
         <div>
           <h2>Einstellungen</h2>
-          <p>Festname, Vereinsname und Logo für Bons und Auswertung.</p>
+          <p>Festname, Organisation und Logo für Bons und Auswertung.</p>
         </div>
         <div class="header-actions">
           ${dirtyIndicator("settings")}
@@ -808,7 +888,7 @@ function settingsTemplate() {
           <input name="eventName" value="${state.settings.eventName}" required />
         </div>
         <div class="field">
-          <label>Vereinsname</label>
+          <label>Organisation</label>
           <input name="clubName" value="${state.settings.clubName}" required />
         </div>
         <div class="field">
@@ -869,14 +949,19 @@ function userAccessTemplate() {
 function infoTemplate() {
   const display = browserDisplayInfo();
   const rows = [
-    ["Programmversion", systemInfo.appVersion || "unknown"],
-    ["Git-Version", systemInfo.gitCommit || "unknown"],
-    ["System", systemInfo.platform || "unknown"],
+    ["Programmversion", displayValue(systemInfo.appVersion, "nicht verfügbar")],
+    ["Git-Version", displayValue(systemInfo.gitCommit, "nicht verfügbar")],
+    ["System", displayValue(systemInfo.platform, navigator.platform || "nicht verfügbar")],
+    ["Node.js", displayValue(systemInfo.nodeVersion, "nicht verfügbar")],
     ["Angemeldet", sessionUser?.username || "-"],
     ["Rolle", sessionUser ? roleLabel(sessionUser.role) : "-"],
     ["Browser-Viewport", display.viewport],
     ["Bildschirm", display.screenSize],
-    ["Pixelverhältnis", display.pixelRatio]
+    ["Pixelverhältnis", display.pixelRatio],
+    ["Lizenz", displayValue(systemInfo.license, "MIT")],
+    ["Copyright", displayValue(systemInfo.copyright, "Copyright (c) Andreas Spitzenberg")],
+    ["GitHub", repositoryLinkTemplate()],
+    ["Online-Version", versionCheck.label]
   ];
   return `
     <section class="panel">
@@ -885,6 +970,7 @@ function infoTemplate() {
           <h2>Info</h2>
           <p>Version und Systemdaten für Fehleranalyse.</p>
         </div>
+        <button class="action-button small-button" type="button" data-version-check>Version prüfen</button>
       </div>
       <table class="info-table">
         <tbody>
@@ -893,6 +979,11 @@ function infoTemplate() {
       </table>
     </section>
   `;
+}
+
+function repositoryLinkTemplate() {
+  const url = displayValue(systemInfo.repositoryUrl, "");
+  return url ? `<a href="${url}" target="_blank" rel="noreferrer">${url}</a>` : "nicht verfügbar";
 }
 
 function printSettingsTemplate() {
@@ -941,8 +1032,6 @@ function dataManagementTemplate() {
           <h3>Daten & Vorlagen</h3>
           <p>Aktuelles Fest speichern oder vorhandene Vorlagen laden.</p>
         </div>
-      </div>
-      <div class="data-actions">
       </div>
       <div class="data-save-row">
         <div class="field data-new-field">
@@ -1173,6 +1262,7 @@ function bindCart() {
   });
 
   document.querySelector("[data-cancel-cart]")?.addEventListener("click", cancelCart);
+  document.querySelector("[data-undo-last-checkout]")?.addEventListener("click", undoLastCheckout);
   document.querySelector("[data-print-paid]").addEventListener("click", () => checkout(false));
   document.querySelector("[data-print-free]").addEventListener("click", () => checkout(true));
 
@@ -1232,6 +1322,7 @@ function bindAdmin() {
   });
 
   document.querySelector("[data-print-report]")?.addEventListener("click", printDailyReport);
+  document.querySelector("[data-version-check]")?.addEventListener("click", checkOnlineVersion);
   document.querySelector("[data-reset-day]")?.addEventListener("click", resetDayCash);
   document.querySelectorAll("[data-print-history]").forEach((button) => {
     button.addEventListener("click", () => printArchivedReport(button.dataset.printHistory));
@@ -1422,6 +1513,34 @@ async function refreshEventCatalog() {
   }
 }
 
+async function checkOnlineVersion() {
+  versionCheck = { status: "checking", label: "prüfe..." };
+  renderAdmin();
+  try {
+    const response = await fetch(`/api/version-check?t=${Date.now()}`, { cache: "no-store" });
+    const payload = response.ok ? await response.json() : {};
+    if (!payload.ok) {
+      versionCheck = {
+        status: "unavailable",
+        label: `nicht geprüft (${payload.error || "keine Verbindung"})`
+      };
+    } else if (payload.updateAvailable) {
+      versionCheck = {
+        status: "update",
+        label: `Update verfügbar: ${payload.latestVersion} (installiert: ${payload.currentVersion})`
+      };
+    } else {
+      versionCheck = {
+        status: "current",
+        label: `aktuell (${payload.currentVersion})`
+      };
+    }
+  } catch (error) {
+    versionCheck = { status: "unavailable", label: "nicht geprüft (keine Verbindung)" };
+  }
+  renderAdmin();
+}
+
 function bindEventCatalogActions() {
   document.querySelectorAll("[data-template-event]").forEach((button) => {
     button.addEventListener("click", () => loadManagedEvent(button.dataset.templateEvent, "template"));
@@ -1446,6 +1565,7 @@ async function saveCurrentEvent(button) {
   }
   const payload = await response.json();
   state = normalizeState(payload.state);
+  systemInfo = { ...systemInfo, ...(payload.system || {}) };
   showToast(`Fest gesichert: ${payload.file}`);
   finishButton("Gespeichert");
   await refreshEventCatalog();
@@ -1498,6 +1618,7 @@ async function applyEventResponse(response, message) {
   }
   const payload = await response.json();
   state = normalizeState(payload.state);
+  systemInfo = { ...systemInfo, ...(payload.system || {}) };
   cart = [];
   paidAmount = "";
   eventCatalog = null;
@@ -1526,6 +1647,8 @@ async function setUserPassword(event) {
     showToast("Passwort konnte nicht gespeichert werden.");
     return;
   }
+  const payload = await response.json().catch(() => ({}));
+  systemInfo = { ...systemInfo, ...(payload.system || {}) };
   event.currentTarget.reset();
   finishButton("Gespeichert");
   showToast(`Passwort für ${username} gespeichert.`);
@@ -1540,8 +1663,8 @@ async function saveSettings(section = "settings", button = getAdminSaveButton(se
     return;
   }
   const form = new FormData(formElement);
-    if (form.has("eventName")) state.settings.eventName = String(form.get("eventName")).trim() || "Feuerwehrfest";
-    if (form.has("clubName")) state.settings.clubName = String(form.get("clubName")).trim() || "Musterverein e.V.";
+    if (form.has("eventName")) state.settings.eventName = String(form.get("eventName")).trim() || "<Festname>";
+    if (form.has("clubName")) state.settings.clubName = String(form.get("clubName")).trim() || "<Organisation>";
     if (form.has("calculatorName")) state.settings.calculatorName = String(form.get("calculatorName")).trim();
     if (form.has("calculatorPhone")) state.settings.calculatorPhone = String(form.get("calculatorPhone")).trim();
     if (form.has("calculatorComment")) state.settings.calculatorComment = String(form.get("calculatorComment")).trim().slice(0, 400);
@@ -1557,6 +1680,7 @@ async function saveSettings(section = "settings", button = getAdminSaveButton(se
           finishButton();
           return;
         }
+        updateFavicon();
         clearAdminDirty(section);
         showToast("Einstellungen gespeichert.");
         finishButton("Gespeichert");
@@ -1769,6 +1893,8 @@ function cancelCart() {
 
 async function checkout(isFree) {
   if (!cart.length) return;
+  const receiptTime = new Date();
+  let nextReceiptNumber = Math.max(1, Number(state.settings.nextReceiptNumber) || 1);
 
   // Kostenlose Buchungen werden als eigene Order Items markiert, damit die Auswertung sie sauber trennen kann.
   const items = cart.map((item) => {
@@ -1793,7 +1919,20 @@ async function checkout(isFree) {
     }
   }
 
-  if (!(await printReceipt(items, total, isFree))) {
+  const receiptItems = items.flatMap((item) =>
+    Array.from({ length: item.quantity }, () => ({
+      articleId: item.articleId,
+      articleName: item.name,
+      name: item.name,
+      price: item.unitPrice,
+      unitPrice: item.unitPrice,
+      isFree,
+      createdAt: receiptTime.toISOString(),
+      receiptNumber: nextReceiptNumber++
+    }))
+  );
+
+  if (!(await printReceipt(receiptItems, total, isFree, receiptTime))) {
     return;
   }
 
@@ -1805,18 +1944,23 @@ async function checkout(isFree) {
     article.stock -= item.quantity;
   });
 
+  const orderId = uid("ord");
+  state.settings.nextReceiptNumber = nextReceiptNumber;
   state.orders.push({
-    id: uid("ord"),
-    createdAt: new Date().toISOString(),
+    id: orderId,
+    createdAt: receiptTime.toISOString(),
     cashierId: sessionUser.id,
     status: "paid",
     paidAmount: isFree ? 0 : Number(paidAmount || total),
     changeAmount: isFree ? 0 : Math.max(0, Number(paidAmount || total) - total),
     total,
+    receiptNumbers: receiptItems.map((receipt) => receipt.receiptNumber),
     items
   });
 
-  saveState();
+  if (!(await saveState())) return;
+  lastCheckout = { orderId, expiresAt: Date.now() + LAST_RECEIPT_UNDO_MS };
+  scheduleUndoCheckoutExpiry();
   cart = [];
   paidAmount = "";
   showToast(isFree ? "Kostenlos gebucht." : "Bezahlt und gespeichert.");
@@ -1824,17 +1968,51 @@ async function checkout(isFree) {
   changedArticleIds.forEach(updateArticleButtonState);
 }
 
-async function printReceipt(items, total, isFree) {
-  const receiptTime = new Date();
+async function undoLastCheckout() {
+  if (!canUndoLastCheckout()) {
+    lastCheckout = null;
+    renderCart();
+    return;
+  }
+
+  const order = state.orders.find((item) => item.id === lastCheckout.orderId && item.status === "paid");
+  if (!order) {
+    lastCheckout = null;
+    renderCart();
+    return;
+  }
+
+  if (!window.confirm("Letzten Bon wirklich stornieren?")) return;
+
+  const changedArticleIds = [];
+  order.items.forEach((item) => {
+    const article = state.articles.find((candidate) => candidate.id === item.articleId);
+    if (!article) return;
+    article.stock += item.quantity;
+    changedArticleIds.push(item.articleId);
+  });
+
+  state.orders = state.orders.filter((item) => item.id !== order.id);
+  state.cancellations.push({
+    id: uid("can"),
+    createdAt: new Date().toISOString(),
+    cashierId: sessionUser.id,
+    reason: "Storno letzter Bon",
+    orderId: order.id,
+    receiptNumbers: order.receiptNumbers || [],
+    items: cloneData(order.items)
+  });
+
+  if (!(await saveState())) return;
+  lastCheckout = null;
+  scheduleUndoCheckoutExpiry();
+  showToast("Letzter Bon storniert.");
+  renderCart();
+  changedArticleIds.forEach(updateArticleButtonState);
+}
+
+async function printReceipt(receipts, total, isFree, receiptTime = new Date()) {
   if (state.settings.printerMode === "textfile" || state.settings.printerMode === "serial") {
-    const receipts = items.flatMap((item) =>
-      Array.from({ length: item.quantity }, () => ({
-        articleName: item.name,
-        price: item.unitPrice,
-        isFree,
-        createdAt: receiptTime.toISOString()
-      }))
-    );
     const response = await fetch("/api/print/receipts", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -1852,13 +2030,11 @@ async function printReceipt(items, total, isFree) {
     return true;
   }
 
-  const receipts = items.flatMap((item) =>
-    Array.from({ length: item.quantity }, () => receiptTemplate(item, receiptTime, isFree))
-  ).join("");
+  const receiptHtml = receipts.map((item) => receiptTemplate(item, receiptTime, isFree)).join("");
 
   renderPrint(`
     <section class="receipt-roll">
-      ${receipts}
+      ${receiptHtml}
     </section>
   `);
   return true;
@@ -1898,11 +2074,11 @@ function receiptTemplate(item, receiptTime, isFree) {
     <article class="receipt-ticket">
       <h1>${state.settings.eventName}</h1>
       <p class="receipt-club">${state.settings.clubName}</p>
+      <p class="receipt-meta">Bon #${formatReceiptNumber(item.receiptNumber)} · ${shortDateTime(receiptTime)}</p>
       <div class="receipt-divider"></div>
-      <strong class="receipt-item">${item.name}</strong>
-      ${isFree ? `<span class="receipt-free">Kostenlos</span>` : `<span class="receipt-price">${money(item.unitPrice)}</span>`}
+      <strong class="receipt-item">${item.articleName || item.name}</strong>
+      ${isFree ? `<span class="receipt-free">Kostenlos</span>` : `<span class="receipt-price">${money(item.price ?? item.unitPrice)}</span>`}
       <div class="receipt-divider"></div>
-      <p>${shortDateTime(receiptTime)}</p>
     </article>
   `;
 }

@@ -1,6 +1,13 @@
 # Festkasse Community Edition
 
-Webbasierte Festkasse fuer Vereine, Feuerwehren und Veranstaltungen.
+Eine kostenlose, lokal betriebene Festkasse fuer Feuerwehren,
+Vereine und ehrenamtliche Veranstaltungen.
+
+- Touchoptimiert
+- Raspberry Pi geeignet
+- Offline nutzbar
+- Keine Cloud notwendig
+- Open Source (MIT)
 
 Ziel dieses Projekts ist es, Vereinen, Feuerwehren und ehrenamtlichen Organisationen eine kostenlose Grundlage fuer eine einfache Festkasse bereitzustellen.
 
@@ -13,7 +20,7 @@ Festkasse ist eine lokale Webanwendung fuer einfache Verkaufs- und Kassensituati
 - Verwaltung von Artikeln, Kategorien, Warenkorb, Druckfunktion, Auswertungen und Benutzerrollen
 - Fokus auf einfache Bedienung und schnelle Kassierung
 - Druckmodi fuer Browserdruck, TXT-Testdruck und vorbereiteten seriellen Thermodrucker
-- Tagesauswertung mit normalen Buchungen, Freibons und Summen
+- Tagesauswertung mit normalen und kostenlosen Buchungen sowie Summen
 
 Version: Community Edition
 
@@ -27,7 +34,7 @@ Zielgruppe:
 
 ### Voraussetzungen
 
-- Node.js LTS
+- Node.js 20 oder hoeher
 - npm
 - Moderner Browser wie Microsoft Edge, Google Chrome, Chromium oder Safari
 - Optional: Git, wenn das Projekt direkt aus GitHub geklont oder aktualisiert werden soll
@@ -78,7 +85,7 @@ npm start
 
 Die Konfiguration erfolgt ueber den Adminbereich der Anwendung:
 
-- Festname, Vereinsname und Logo
+- Festname, Organisation und Logo
 - Artikel, Kategorien, Preise und Bestand
 - Benutzerpasswoerter
 - Druckmodus und Drucker-Port
@@ -113,7 +120,7 @@ Passwoerter werden serverseitig als Salt + Hash gespeichert. Ueber **Admin > Ben
 - Kassenansicht mit grossen Artikelkarten
 - Warenkorb mit Erhalten/Rueckgeld, Positionen erhoehen, reduzieren und loeschen
 - Bon drucken fuer normale Buchungen
-- Freibon buchen fuer kostenlose Buchungen mit Bestandsreduzierung
+- Kostenlos buchen fuer kostenlose Buchungen mit Bestandsreduzierung
 - Tagesauswertung mit Normal, Kostenlos und Summe
 - Tageskasse abschliessen mit historischem Tagesabschluss
 - Artikel- und Kategorieverwaltung mit Reihenfolge, Farben und Speicher-Feedback
@@ -130,21 +137,18 @@ Im Bereich **Drucken** kann der Druckmodus gesetzt werden:
 
 Tagesauswertungen und historische Tagesabschluesse nutzen dieselbe zentrale Druckeinstellung.
 
-## Sicherheit vor Veroeffentlichung
-
-Vor einer oeffentlichen Veroeffentlichung sollten insbesondere folgende Punkte geprueft werden:
-
-- Keine Passwoerter, API-Keys, Tokens oder privaten Zugangsdaten im Repository
-- Keine produktiven `.env`- oder lokalen Konfigurationsdateien
-- Keine Screenshots mit personenbezogenen Daten
-- Keine Testdaten mit realen Namen, Telefonnummern oder E-Mail-Adressen
-- Keine Laufzeitdaten aus `data/events`, `data/archive`, `data/prints`, lokalen Datenbanken, Backups oder Logs
-
-Der aktuelle Repository-Stand verwendet neutrale Beispieldaten. Lokale Laufzeitdaten sollten vor einer Veroeffentlichung nicht committed werden.
-
 ## Haftungsausschluss
 
 Diese Software wird kostenlos und ohne Gewährleistung bereitgestellt. Die Nutzung erfolgt auf eigenes Risiko. Es besteht kein Anspruch auf Support, Fehlerbehebungen oder Weiterentwicklung.
+
+## Wichtiger Hinweis
+
+Diese Software ist nicht als fiskalisiertes Kassensystem konzipiert
+und erfuellt keine gesetzlichen Anforderungen an Registrierkassen,
+TSE-Systeme oder vergleichbare Kassensicherungsverordnungen.
+
+Die Software richtet sich primaer an Vereine, Feuerwehren und
+ehrenamtliche Veranstaltungen.
 
 ## Rechtlicher Hinweis
 

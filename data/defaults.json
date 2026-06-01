@@ -166,8 +166,8 @@
   "cancellations": [],
   "dayReports": [],
   "settings": {
-    "clubName": "Musterverein e.V.",
-    "eventName": "Sommerfest",
+    "clubName": "<Organisation>",
+    "eventName": "<Festname>",
     "currency": "EUR",
     "defaultWarningStock": 5,
     "printerName": "Browserdruck",
@@ -181,6 +181,7 @@
     "calculatorComment": "",
     "menuVersion": 5,
     "activeEventFile": "fest.json",
+    "nextReceiptNumber": 1,
     "categories": [
       {
         "name": "Schnitzel",

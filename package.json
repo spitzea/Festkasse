@@ -3,6 +3,10 @@
   "version": "0.1.0",
   "description": "Webbasierte Festkasse Community Edition fuer Vereine, Feuerwehren und ehrenamtliche Organisationen",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/spitzea/Festkasse.git"
+  },
   "private": true,
   "scripts": {
     "start": "node server.js"

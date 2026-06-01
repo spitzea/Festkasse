@@ -323,6 +323,11 @@ textarea:focus-visible {
   padding: 0.75rem clamp(0.75rem, 2vw, 1.4rem) 1rem;
 }
 
+.top-clock {
+  min-height: 2.9rem;
+  align-items: center;
+}
+
 .panel {
   background: rgba(32, 32, 36, 0.94);
   border: 1px solid var(--line);
@@ -492,9 +497,15 @@ textarea:focus-visible {
 }
 
 .cart {
+  align-self: start;
+}
+
+.cart-column {
   position: sticky;
   top: 5.4rem;
   align-self: start;
+  display: grid;
+  gap: 0.75rem;
 }
 
 .cart-body {
@@ -504,10 +515,7 @@ textarea:focus-visible {
 .contact-box {
   display: grid;
   gap: 0.3rem;
-  margin-top: 0.8rem;
   padding: 0.75rem;
-  border: 1px solid var(--line);
-  border-radius: var(--radius-md);
   background: var(--panel-soft);
 }
 
@@ -538,8 +546,8 @@ textarea:focus-visible {
 .cart-row {
   display: grid;
   grid-template-columns: 1fr auto;
-  gap: 0.6rem;
-  padding: 0.7rem 0;
+  gap: 0.5rem;
+  padding: 0.5rem 0;
   border-bottom: 1px solid var(--line);
 }
 
@@ -549,8 +557,8 @@ textarea:focus-visible {
 
 .cart-row strong {
   display: block;
-  font-size: 1rem;
-  line-height: 1.25;
+  font-size: 0.92rem;
+  line-height: 1.1;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -559,8 +567,8 @@ textarea:focus-visible {
 .cart-row span {
   display: block;
   color: var(--muted);
-  font-size: 0.94rem;
-  line-height: 1.2;
+  font-size: 0.82rem;
+  line-height: 1.08;
   white-space: nowrap;
 }
 
@@ -636,6 +644,13 @@ textarea:focus-visible {
   display: grid;
   grid-template-columns: 1fr;
   gap: 0.65rem;
+}
+
+.undo-button {
+  margin: 0.65rem 0.75rem 0;
+  min-height: 2.25rem;
+  color: var(--amber);
+  border-color: rgba(255, 214, 10, 0.55);
 }
 
 .login-screen {
@@ -804,12 +819,8 @@ textarea:focus-visible {
 .data-panel {
   display: grid;
   gap: var(--space-md);
-  padding: 0;
-  border-top: 0;
-  background: rgba(24, 24, 27, 0.4);
 }
 
-.data-panel > .data-actions,
 .data-panel > .data-save-row,
 .data-panel > .event-list {
   margin-inline: 1rem;
@@ -884,6 +895,10 @@ textarea:focus-visible {
 .info-table td {
   font-weight: 800;
   overflow-wrap: anywhere;
+}
+
+.info-table a {
+  color: var(--amber);
 }
 
 .event-list {
@@ -1121,9 +1136,11 @@ textarea:focus-visible {
 
 .report-table th,
 .report-table td {
-  padding: 0.42rem 0.5rem;
+  padding: 0.24rem 0.38rem;
   text-align: left;
   border-bottom: 1px solid var(--line);
+  font-size: 0.88rem;
+  line-height: 1.08;
 }
 
 .report-table th:nth-child(2),
@@ -1267,6 +1284,10 @@ textarea:focus-visible {
     position: static;
   }
 
+  .cart-column {
+    position: static;
+  }
+
   .article-form,
   .category-create,
   .category-edit-card,
@@ -1390,13 +1411,13 @@ textarea:focus-visible {
   }
 
   .report-table {
-    font-size: 0.85rem;
+    font-size: 0.8rem;
   }
 
   .report-table th,
   .report-table td {
-    padding: 0.3rem 0.35rem;
-    line-height: 1.15;
+    padding: 0.18rem 0.28rem;
+    line-height: 1.04;
   }
 
   .report-table th:nth-child(2),
@@ -1492,6 +1513,11 @@ textarea:focus-visible {
 
   .receipt-club {
     font-size: 8pt;
+  }
+
+  .receipt-meta {
+    font-size: 7pt;
+    line-height: 1.1;
   }
 
   .receipt-divider {

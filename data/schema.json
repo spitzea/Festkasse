@@ -31,6 +31,10 @@
       "paidAmount": 10,
       "changeAmount": 3,
       "total": 7,
+      "receiptNumbers": [
+        1,
+        2
+      ],
       "items": [
         {
           "id": "itm_001",
@@ -57,8 +61,8 @@
     {
       "id": "day_001",
       "createdAt": "2026-01-01T20:00:00.000Z",
-      "eventName": "Sommerfest",
-      "clubName": "Musterverein e.V.",
+      "eventName": "<Festname>",
+      "clubName": "<Organisation>",
       "logoDataUrl": "",
       "total": 7,
       "orderCount": 1,
@@ -66,8 +70,8 @@
     }
   ],
   "settings": {
-    "clubName": "Musterverein e.V.",
-    "eventName": "Sommerfest",
+    "clubName": "<Organisation>",
+    "eventName": "<Festname>",
     "currency": "EUR",
     "defaultWarningStock": 5,
     "printerName": "Browserdruck",
@@ -81,6 +85,7 @@
     "calculatorComment": "",
     "menuVersion": 5,
     "activeEventFile": "fest.json",
+    "nextReceiptNumber": 1,
     "categories": [
       {
         "name": "Speisen",
