@@ -79,6 +79,48 @@
   color: #991b1b;
 }
 
+:root[data-theme="light"] .tab-button.active,
+:root[data-theme="light"] .primary-button,
+:root[data-theme="light"] .menu-nav .ghost-button.active,
+:root[data-theme="light"] .menu-logout-button {
+  color: #ffffff;
+}
+
+:root[data-theme="light"] .action-button {
+  color: #78350f;
+}
+
+:root[data-theme="light"] .action-button:not(:disabled):hover {
+  color: #451a03;
+}
+
+:root[data-theme="light"] .ghost-button,
+:root[data-theme="light"] .small-button,
+:root[data-theme="light"] .qty-button {
+  color: #374151;
+}
+
+:root[data-theme="light"] .unsaved-badge {
+  background: #fffbeb;
+  color: #92400e;
+}
+
+:root[data-theme="light"] .saved-badge {
+  background: #ecfdf5;
+  color: #166534;
+}
+
+:root[data-theme="light"] .article-form,
+:root[data-theme="light"] .category-create,
+:root[data-theme="light"] .login-access {
+  background: #f9fafb;
+}
+
+:root[data-theme="light"] .toast-info {
+  color: #111827;
+  background: #ffffff;
+}
+
 * {
   box-sizing: border-box;
 }
