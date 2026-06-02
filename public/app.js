@@ -707,6 +707,16 @@ function articleManagementTemplate() {
       </div>
       ${articleFormTemplate()}
       <div class="article-list">
+        <div class="article-list-header" aria-hidden="true">
+          <span></span>
+          <span>Name</span>
+          <span>Preis</span>
+          <span>Bestand</span>
+          <span>Warnung</span>
+          <span>Kategorie</span>
+          <span>Status</span>
+          <span></span>
+        </div>
         ${state.articles.map((article, index) => articleEditTemplate(article, index)).join("")}
       </div>
     </section>
@@ -1053,7 +1063,7 @@ function dataManagementTemplate() {
     <section class="panel data-panel">
       <div class="panel-header">
         <div>
-          <h3>Daten & Vorlagen</h3>
+          <h2>Daten & Vorlagen</h2>
           <p>Aktuelles Fest speichern oder vorhandene Vorlagen laden.</p>
         </div>
       </div>
