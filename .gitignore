@@ -11,7 +11,6 @@ backups/
 *.temp
 tmp/
 temp/
-data/archive/*.json
-data/events/*.json
+data/saved/*.json
 data/prints/*.txt
 *.log

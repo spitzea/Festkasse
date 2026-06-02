@@ -180,7 +180,7 @@
     "calculatorPhone": "",
     "calculatorComment": "",
     "menuVersion": 5,
-    "activeEventFile": "fest.json",
+    "activeEventFile": "active-event.json",
     "nextReceiptNumber": 1,
     "categories": [
       {

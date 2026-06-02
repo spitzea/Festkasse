@@ -12,11 +12,12 @@ const { execFile, execFileSync } = require("child_process");
 const port = process.env.PORT || 3000;
 const publicDir = path.join(__dirname, "public");
 const dataDir = path.join(__dirname, "data");
-const eventsDir = path.join(dataDir, "events");
-const archiveDir = path.join(dataDir, "archive");
+const savedDir = path.join(dataDir, "saved");
+const legacyEventsDir = path.join(dataDir, "events");
+const legacyActivePath = path.join(dataDir, "fest.json");
 const printsDir = path.join(dataDir, "prints");
 const defaultsPath = path.join(dataDir, "defaults.json");
-const activePath = path.join(dataDir, "fest.json");
+const activePath = path.join(dataDir, "active-event.json");
 const packagePath = path.join(__dirname, "package.json");
 const latestVersionUrl = process.env.FESTKASSE_LATEST_VERSION_URL || "https://raw.githubusercontent.com/spitzea/Festkasse/main/package.json";
 const defaultSerialPrinterPort = "/dev/ttyUSB0";
@@ -83,7 +84,7 @@ const defaultState = {
     calculatorPhone: "",
     calculatorComment: "",
     menuVersion: 5,
-    activeEventFile: "fest.json",
+    activeEventFile: "active-event.json",
     nextReceiptNumber: 1,
     categories: [
       { name: "Schnitzel", color: "#e32626" },
@@ -96,15 +97,39 @@ const defaultState = {
 };
 
 async function ensureDataFiles() {
-  await fsp.mkdir(eventsDir, { recursive: true });
-  await fsp.mkdir(archiveDir, { recursive: true });
+  await fsp.mkdir(savedDir, { recursive: true });
   await fsp.mkdir(printsDir, { recursive: true });
+  await migrateLegacyDataFiles();
   if (!fs.existsSync(defaultsPath)) {
     await writeJson(defaultsPath, defaultState);
   }
   if (!fs.existsSync(activePath)) {
     const defaults = await readJson(defaultsPath);
     await writeJson(activePath, createTemplateState(defaults, defaults.settings.eventName));
+  }
+}
+
+async function migrateLegacyDataFiles() {
+  if (!fs.existsSync(activePath) && fs.existsSync(legacyActivePath)) {
+    await fsp.copyFile(legacyActivePath, activePath);
+  }
+  if (fs.existsSync(activePath)) {
+    const active = await readJson(activePath);
+    if (active.settings?.activeEventFile !== "active-event.json") {
+      active.settings = { ...(active.settings || {}), activeEventFile: "active-event.json" };
+      await writeJson(activePath, active);
+    }
+  }
+
+  if (!fs.existsSync(legacyEventsDir)) return;
+  const files = await fsp.readdir(legacyEventsDir, { withFileTypes: true });
+  for (const file of files) {
+    if (!file.isFile() || !file.name.endsWith(".json")) continue;
+    const source = path.join(legacyEventsDir, file.name);
+    const target = path.join(savedDir, file.name);
+    if (!fs.existsSync(target)) {
+      await fsp.rename(source, target);
+    }
   }
 }
 
@@ -202,7 +227,7 @@ function createTemplateState(source, eventName = source.settings?.eventName || "
     settings: {
       ...(source.settings || {}),
       eventName,
-      activeEventFile: "fest.json",
+      activeEventFile: "active-event.json",
       nextReceiptNumber: 1
     }
   };
@@ -574,10 +599,8 @@ async function writeReportTextFile(report, settings) {
 
 function resolveManagedFile(fileName) {
   const safeName = path.basename(String(fileName || ""));
-  const eventPath = path.join(eventsDir, safeName);
-  const archivePath = path.join(archiveDir, safeName);
-  if (fs.existsSync(eventPath)) return eventPath;
-  if (fs.existsSync(archivePath)) return archivePath;
+  const savedPath = path.join(savedDir, safeName);
+  if (fs.existsSync(savedPath)) return savedPath;
   throw Object.assign(new Error("Datei nicht gefunden."), { status: 404 });
 }
 
@@ -801,11 +824,10 @@ async function handleApi(req, res, urlPath) {
 
   if (req.method === "GET" && urlPath === "/api/events") {
     const active = await readJson(activePath);
-    const events = await listManagedFiles(eventsDir, "event");
-    const archive = await listManagedFiles(archiveDir, "archive");
+    const saved = await listManagedFiles(savedDir, "saved");
     sendJson(res, 200, {
       active: {
-        file: "fest.json",
+        file: "active-event.json",
         eventName: active.settings?.eventName || "Aktuelles Fest",
         clubName: active.settings?.clubName || "",
         orderCount: active.orders?.length || 0,
@@ -817,8 +839,7 @@ async function handleApi(req, res, urlPath) {
         sourceEventName: defaultState.settings.eventName,
         clubName: defaultState.settings.clubName
       },
-      events,
-      archive
+      saved
     });
     return;
   }
@@ -838,7 +859,7 @@ async function handleApi(req, res, urlPath) {
         updatedAt: savedAt.toISOString()
       }
     };
-    await writeJson(path.join(eventsDir, fileName), savedState);
+    await writeJson(path.join(savedDir, fileName), savedState);
     sendJson(res, 200, { file: fileName, state: sanitizeState(active), system: systemInfo(active) });
     return;
   }
@@ -848,7 +869,7 @@ async function handleApi(req, res, urlPath) {
     const source = body.source === "defaults" ? await readJson(defaultsPath) : await readJson(resolveManagedFile(body.file));
     const nextState = body.mode === "template"
       ? createTemplateState(source)
-      : { ...source, settings: { ...(source.settings || {}), activeEventFile: "fest.json" } };
+      : { ...source, settings: { ...(source.settings || {}), activeEventFile: "active-event.json" } };
     await writeJson(activePath, nextState);
     sendJson(res, 200, { state: sanitizeState(nextState), system: systemInfo(nextState) });
     return;

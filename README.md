@@ -95,13 +95,12 @@ Die aktive Datenquelle liegt im Ordner `data`:
 
 ```text
 data/defaults.json       neutrale Grunddaten und Systemvorlage
-data/fest.json           aktuell geladenes/laufendes Fest
-data/events/*.json       gespeicherte Festvorlagen zur Laufzeit
-data/archive/*.json      optionale Archivdaten zur Laufzeit
+data/active-event.json   aktuell geladenes/laufendes Fest
+data/saved/*.json        gespeicherte Festvorlagen zur Laufzeit
 data/prints/*.txt        TXT-Testbons und TXT-Auswertungen
 ```
 
-`data/defaults.json`, `data/fest.json` und `data/schema.json` sind Teil des Repositories. Laufzeitdateien aus `data/events`, `data/archive` und `data/prints` werden ignoriert, damit lokale Vorlagen, Archivdaten und Testbons nicht versehentlich veroeffentlicht werden.
+`data/defaults.json` und `data/active-event.json` sind Teil des Repositories. Laufzeitdateien aus `data/saved` und `data/prints` werden ignoriert, damit lokale Vorlagen und Testbons nicht versehentlich veroeffentlicht werden.
 
 ## Standardzugaenge
 
@@ -174,7 +173,8 @@ Die App nutzt bewusst keine Frontend-Frameworks:
 server.js          Node-HTTP-Server, JSON-Daten, Login, Druck-Endpunkte
 public/app.js      Browserlogik und UI-Rendering
 public/styles.css  Designsystem, Layout und Print-CSS
-data/schema.json   Datenmodell-Dokumentation
+data/defaults.json neutrale Grunddaten und Systemvorlage
+data/active-event.json aktueller Laufzeitstand
 ```
 
 Vor einem Commit sinnvoll pruefen:

@@ -31,7 +31,7 @@ const seedData = {
     calculatorPhone: "",
     calculatorComment: "",
     menuVersion: 5,
-    activeEventFile: "fest.json",
+    activeEventFile: "active-event.json",
     nextReceiptNumber: 1,
     categories: []
   }
@@ -134,7 +134,7 @@ function normalizeState(data) {
   normalized.dayReports ||= [];
   normalized.settings.nextReceiptNumber = Math.max(1, Number(normalized.settings.nextReceiptNumber) || 1);
   normalized.settings.menuVersion = 5;
-  normalized.settings.activeEventFile ||= "fest.json";
+  normalized.settings.activeEventFile ||= "active-event.json";
   normalized.articles = normalized.articles.map((article, index) => ({
     ...article,
     sortOrder: Number.isFinite(Number(article.sortOrder)) ? Number(article.sortOrder) : index + 1
@@ -1078,8 +1078,7 @@ function eventCatalogTemplate() {
   }
 
   const savedEvents = [
-    ...(eventCatalog.events || []),
-    ...(eventCatalog.archive || [])
+    ...(eventCatalog.saved || [])
   ];
 
   return `
@@ -1102,7 +1101,7 @@ function eventCatalogTemplate() {
 }
 
 function eventMetaTemplate(event) {
-  const typeLabel = event.type === "archive" ? "Archiv" : event.type === "defaults" ? "Systemvorlage" : "Vorlage";
+  const typeLabel = event.type === "defaults" ? "Systemvorlage" : "Vorlage";
   const date = event.updatedAt
     ? new Date(event.updatedAt)
     : new Date();

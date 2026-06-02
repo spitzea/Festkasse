@@ -108,7 +108,7 @@ COM3
 Die aktiven Daten liegen im Projektordner unter:
 
 ```text
-data/fest.json
+data/active-event.json
 ```
 
-Gespeicherte Vorlagen, Archivdaten und Testdrucke liegen ebenfalls unter `data`. Den Projektordner deshalb nicht in einen schreibgeschützten Bereich legen.
+Gespeicherte Vorlagen und Testdrucke liegen ebenfalls unter `data`. Den Projektordner deshalb nicht in einen schreibgeschützten Bereich legen.
