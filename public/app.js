@@ -1076,32 +1076,47 @@ function eventCatalogTemplate() {
     return `<p class="hint">Vorlagen werden geladen...</p>`;
   }
 
-  const rows = [
-    {
-      type: "defaults",
-      file: "defaults.json",
-      eventName: "Default",
-      clubName: eventCatalog.defaults?.clubName || "Grunddaten",
-      locked: true
-    },
+  const defaultEvent = {
+    type: "defaults",
+    file: "defaults.json",
+    eventName: "Default",
+    clubName: eventCatalog.defaults?.clubName || "Grunddaten",
+    locked: true
+  };
+  const savedEvents = [
     ...(eventCatalog.events || []),
     ...(eventCatalog.archive || [])
   ];
 
-  return rows.map((event) => `
-    <article class="event-card">
+  return `
+    <section class="history-panel template-default-panel">
+      <h3>Systemvorlage</h3>
+      <article class="history-card">
+        <div>
+          <strong>${defaultEvent.eventName}</strong>
+          <span>${eventMetaTemplate(defaultEvent)}</span>
+        </div>
+        <div class="history-actions">
+          <button class="action-button small-button" data-load-default-event>Default laden</button>
+        </div>
+      </article>
+    </section>
+    <section class="history-panel template-history-panel">
+      <h3>Gespeicherte Vorlagen</h3>
+      ${savedEvents.length ? savedEvents.map((event) => `
+    <article class="history-card">
       <div>
         <strong>${event.eventName}</strong>
         <span>${eventMetaTemplate(event)}</span>
       </div>
-      <div class="event-actions">
-        ${event.type === "defaults"
-          ? `<button class="action-button small-button" data-load-default-event>Fest laden</button>`
-          : `<button class="action-button small-button" data-template-event="${event.file}">Fest laden</button>
-             <button class="danger-button small-button" data-delete-event="${event.file}">Löschen</button>`}
+      <div class="history-actions">
+        <button class="action-button small-button" data-template-event="${event.file}">Fest laden</button>
+        <button class="danger-button small-button" data-delete-event="${event.file}">Löschen</button>
       </div>
     </article>
-  `).join("");
+  `).join("") : `<p class="hint">Noch keine gespeicherten Vorlagen.</p>`}
+    </section>
+  `;
 }
 
 function eventMetaTemplate(event) {
