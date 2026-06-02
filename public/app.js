@@ -1063,6 +1063,7 @@ function dataManagementTemplate() {
           <input data-new-event-name value="${state.settings.eventName}" />
         </div>
         <button class="action-button" data-save-current-event>Aktuelles Fest speichern</button>
+        <button class="action-button" data-load-default-event>Default laden</button>
       </div>
       <div class="event-list" data-event-list>
         ${eventCatalogTemplate()}
@@ -1076,31 +1077,12 @@ function eventCatalogTemplate() {
     return `<p class="hint">Vorlagen werden geladen...</p>`;
   }
 
-  const defaultEvent = {
-    type: "defaults",
-    file: "defaults.json",
-    eventName: "Default",
-    clubName: eventCatalog.defaults?.clubName || "Grunddaten",
-    locked: true
-  };
   const savedEvents = [
     ...(eventCatalog.events || []),
     ...(eventCatalog.archive || [])
   ];
 
   return `
-    <section class="history-panel template-default-panel">
-      <h3>Systemvorlage</h3>
-      <article class="history-card">
-        <div>
-          <strong>${defaultEvent.eventName}</strong>
-          <span>${eventMetaTemplate(defaultEvent)}</span>
-        </div>
-        <div class="history-actions">
-          <button class="action-button small-button" data-load-default-event>Default laden</button>
-        </div>
-      </article>
-    </section>
     <section class="history-panel template-history-panel">
       <h3>Gespeicherte Vorlagen</h3>
       ${savedEvents.length ? savedEvents.map((event) => `
@@ -1653,13 +1635,12 @@ async function loadDefaultEvent() {
   const response = await fetch("/api/events/load", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ source: "defaults", mode: "template", eventName: state.settings.eventName })
+    body: JSON.stringify({ source: "defaults", mode: "template" })
   });
   await applyEventResponse(response, "Default als Vorlage geladen.");
 }
 
 async function loadManagedEvent(file, mode) {
-  const eventName = document.querySelector("[data-new-event-name]")?.value || state.settings.eventName;
   const text = mode === "template"
     ? `Fest "${file}" als Vorlage verwenden?\n\nVerkäufe und Tagesabschlüsse werden geleert, Artikel und Einstellungen übernommen.`
     : `Fest "${file}" vollständig laden?\n\nDas aktuelle Fest wird ersetzt.`;
@@ -1667,7 +1648,7 @@ async function loadManagedEvent(file, mode) {
   const response = await fetch("/api/events/load", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ file, mode, eventName })
+    body: JSON.stringify({ file, mode })
   });
   await applyEventResponse(response, mode === "template" ? "Vorlage geladen." : "Fest geladen.");
 }

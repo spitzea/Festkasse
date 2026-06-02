@@ -1051,13 +1051,17 @@ textarea:focus-visible {
 
 .data-save-row {
   display: grid;
-  grid-template-columns: minmax(18rem, 32rem) max-content;
+  grid-template-columns: minmax(18rem, 32rem) max-content 1fr;
   align-items: end;
   gap: var(--space-md);
 }
 
 .data-save-row .action-button {
   min-width: 14rem;
+}
+
+.data-save-row [data-load-default-event] {
+  justify-self: end;
 }
 
 .settings-test-print {

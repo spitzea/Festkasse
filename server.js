@@ -197,7 +197,6 @@ function createTemplateState(source, eventName = source.settings?.eventName || "
     dayReports: [],
     articles: (source.articles || []).map((article, index) => ({
       ...article,
-      stock: 500,
       sortOrder: Number.isFinite(Number(article.sortOrder)) ? Number(article.sortOrder) : index + 1
     })),
     settings: {
@@ -848,7 +847,7 @@ async function handleApi(req, res, urlPath) {
     const body = await readBody(req);
     const source = body.source === "defaults" ? await readJson(defaultsPath) : await readJson(resolveManagedFile(body.file));
     const nextState = body.mode === "template"
-      ? createTemplateState(source, body.eventName || source.settings?.eventName)
+      ? createTemplateState(source)
       : { ...source, settings: { ...(source.settings || {}), activeEventFile: "fest.json" } };
     await writeJson(activePath, nextState);
     sendJson(res, 200, { state: sanitizeState(nextState), system: systemInfo(nextState) });
