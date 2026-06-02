@@ -22,6 +22,16 @@
   --danger: #c92a2a;
   --danger-dark: #8f1e1e;
   --disabled: #4a4a51;
+  --button-neutral-bg: var(--panel-strong);
+  --button-neutral-text: var(--text);
+  --button-primary-text: #ffffff;
+  --button-action-bg: color-mix(in srgb, var(--panel-strong) 86%, var(--amber));
+  --button-action-hover-bg: color-mix(in srgb, var(--panel-strong) 78%, var(--amber));
+  --button-action-text: #f7e4b2;
+  --button-action-hover-text: #f7e4b2;
+  --button-active-bg: var(--red-soft);
+  --button-active-text: var(--text);
+  --button-danger-text: #ffffff;
   --space-xs: 0.35rem;
   --space-sm: 0.65rem;
   --space-md: 1rem;
@@ -54,6 +64,16 @@
   --red-dark: #7f1d1d;
   --red-soft: rgba(185, 28, 28, 0.09);
   --disabled: #e5e7eb;
+  --button-neutral-bg: #f3f4f6;
+  --button-neutral-text: #111827;
+  --button-primary-text: #ffffff;
+  --button-action-bg: #fef3c7;
+  --button-action-hover-bg: #fde68a;
+  --button-action-text: #78350f;
+  --button-action-hover-text: #451a03;
+  --button-active-bg: linear-gradient(135deg, var(--red), var(--red-dark));
+  --button-active-text: #ffffff;
+  --button-danger-text: #ffffff;
   --shadow-sm: 0 8px 20px rgba(15, 23, 42, 0.08);
   --shadow-md: 0 18px 42px rgba(15, 23, 42, 0.1);
 }
@@ -77,27 +97,6 @@
 
 :root[data-theme="light"] .error {
   color: #991b1b;
-}
-
-:root[data-theme="light"] .tab-button.active,
-:root[data-theme="light"] .primary-button,
-:root[data-theme="light"] .menu-nav .ghost-button.active,
-:root[data-theme="light"] .menu-logout-button {
-  color: #ffffff;
-}
-
-:root[data-theme="light"] .action-button {
-  color: #78350f;
-}
-
-:root[data-theme="light"] .action-button:not(:disabled):hover {
-  color: #451a03;
-}
-
-:root[data-theme="light"] .ghost-button,
-:root[data-theme="light"] .small-button,
-:root[data-theme="light"] .qty-button {
-  color: #374151;
 }
 
 :root[data-theme="light"] .unsaved-badge {
@@ -324,11 +323,12 @@ textarea:focus-visible {
 
 .menu-nav .ghost-button.active {
   border-color: color-mix(in srgb, var(--red) 60%, var(--line));
-  background: var(--red-soft);
+  background: var(--button-active-bg);
+  color: var(--button-active-text);
 }
 
 .menu-logout-button {
-  color: #f7e4b2;
+  color: var(--button-action-text);
 }
 
 .theme-menu {
@@ -417,8 +417,8 @@ textarea:focus-visible {
   min-height: 2.55rem;
   padding: 0.5rem 0.75rem;
   border-radius: var(--radius-md);
-  color: var(--text);
-  background: var(--panel-strong);
+  color: var(--button-neutral-text);
+  background: var(--button-neutral-bg);
   font-weight: 800;
   white-space: nowrap;
 }
@@ -426,13 +426,14 @@ textarea:focus-visible {
 .tab-button.active,
 .primary-button {
   background: linear-gradient(135deg, var(--red), var(--red-dark));
+  color: var(--button-primary-text);
   box-shadow: var(--shadow-sm);
 }
 
 .action-button {
   border: 1px solid color-mix(in srgb, var(--amber) 42%, var(--line));
-  background: color-mix(in srgb, var(--panel-strong) 86%, var(--amber));
-  color: #f7e4b2;
+  background: var(--button-action-bg);
+  color: var(--button-action-text);
   box-shadow: none;
 }
 
@@ -443,7 +444,8 @@ textarea:focus-visible {
 
 .action-button:not(:disabled):hover {
   border-color: color-mix(in srgb, var(--amber) 65%, #fff);
-  background: color-mix(in srgb, var(--panel-strong) 78%, var(--amber));
+  background: var(--button-action-hover-bg);
+  color: var(--button-action-hover-text);
 }
 
 .ghost-button {
@@ -453,7 +455,7 @@ textarea:focus-visible {
 
 .danger-button {
   background: linear-gradient(135deg, var(--danger), var(--danger-dark));
-  color: #fff;
+  color: var(--button-danger-text);
 }
 
 .small-button {
