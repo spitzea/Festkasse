@@ -422,10 +422,9 @@ function escposText(text) {
 
 function escposReceiptBody(receipt, settings) {
   const width = 42;
-  const wideWidth = 21;
   const time = receipt.createdAt ? new Date(receipt.createdAt) : new Date();
   const receiptNumber = formatReceiptNumber(receipt.receiptNumber);
-  const articleLines = wrapText(receipt.articleName || "Artikel", wideWidth).map((line) => `${centerText(line, wideWidth)}\r\n`);
+  const articleLines = wrapText(receipt.articleName || "Artikel", width).map((line) => `${centerText(line, width)}\r\n`);
   const chunks = [
     Buffer.from([0x1b, 0x40]),
     Buffer.from([0x1b, 0x74, 0x06]),
@@ -434,7 +433,7 @@ function escposReceiptBody(receipt, settings) {
     escposText(`${settings.clubName || ""}\r\n`),
     escposText(`${"-".repeat(width)}\r\n\r\n`),
     Buffer.from([0x1b, 0x45, 0x01]),
-    Buffer.from([0x1d, 0x21, 0x11]),
+    Buffer.from([0x1d, 0x21, 0x01]),
     ...articleLines.map(escposText),
     Buffer.from([0x1d, 0x21, 0x00]),
     Buffer.from([0x1b, 0x45, 0x00])
@@ -449,7 +448,7 @@ function escposReceiptBody(receipt, settings) {
   chunks.push(
     escposText(`\r\n${"-".repeat(width)}\r\n`),
     escposText(`Bon #${receiptNumber}  ${receiptDateTimeText(time)}\r\n`),
-    Buffer.from([0x1b, 0x64, 0x04])
+    Buffer.from([0x1b, 0x64, 0x0c])
   );
   return Buffer.concat(chunks);
 }
