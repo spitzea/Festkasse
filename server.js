@@ -314,7 +314,7 @@ function formatReceiptText(receipt, settings) {
   lines.push(
     "",
     "-".repeat(width),
-    centerText(`Bon #${receiptNumber}  ${receiptDateTimeText(time)}`, width)
+    centerText(receipt.isTest ? `Testdruck  ${receiptDateTimeText(time)}` : `Bon #${receiptNumber}  ${receiptDateTimeText(time)}`, width)
   );
 
   if (receipt.isFree) {
@@ -416,6 +416,10 @@ function escposCut() {
   return Buffer.from([0x1d, 0x56, 0x01]);
 }
 
+function escposFeed(lines) {
+  return Buffer.from([0x1b, 0x64, Math.max(0, Math.min(255, Number(lines) || 0))]);
+}
+
 function escposText(text) {
   return encodePrinterText(text);
 }
@@ -424,14 +428,14 @@ function escposReceiptBody(receipt, settings) {
   const width = 42;
   const time = receipt.createdAt ? new Date(receipt.createdAt) : new Date();
   const receiptNumber = formatReceiptNumber(receipt.receiptNumber);
-  const articleLines = wrapText(receipt.articleName || "Artikel", width).map((line) => `${centerText(line, width)}\r\n`);
+  const articleLines = wrapText(receipt.articleName || "Artikel", width).map((line) => `${line}\r\n`);
   const chunks = [
     Buffer.from([0x1b, 0x40]),
     Buffer.from([0x1b, 0x74, 0x06]),
     Buffer.from([0x1b, 0x61, 0x01]),
     escposText(`${settings.eventName || "Festkasse"}\r\n`),
     escposText(`${settings.clubName || ""}\r\n`),
-    escposText(`${"-".repeat(width)}\r\n\r\n`),
+    escposText(`${"-".repeat(width)}\r\n`),
     Buffer.from([0x1b, 0x45, 0x01]),
     Buffer.from([0x1d, 0x21, 0x01]),
     ...articleLines.map(escposText),
@@ -447,8 +451,8 @@ function escposReceiptBody(receipt, settings) {
 
   chunks.push(
     escposText(`\r\n${"-".repeat(width)}\r\n`),
-    escposText(`Bon #${receiptNumber}  ${receiptDateTimeText(time)}\r\n`),
-    Buffer.from([0x1b, 0x64, 0x0c])
+    escposText(`${receipt.isTest ? "Testdruck" : `Bon #${receiptNumber}`}  ${receiptDateTimeText(time)}\r\n`),
+    escposFeed(8)
   );
   return Buffer.concat(chunks);
 }
@@ -524,6 +528,8 @@ async function printReceiptsSerial(receipts, settings) {
 async function printReportSerial(report, settings) {
   await writeSerialPrinterJobs([
     { buffer: escposPrintBody(formatReportText(report, settings)) },
+    { delayMs: 900 },
+    { buffer: escposFeed(12) },
     { delayMs: 900 },
     { buffer: escposCut() }
   ], settings);
@@ -940,8 +946,9 @@ async function handleApi(req, res, urlPath) {
       articleName: "Testbon Festkasse",
       price: 1.23,
       isFree: false,
+      isTest: true,
       createdAt: new Date().toISOString(),
-      receiptNumber: Number(state.settings?.nextReceiptNumber) || 1
+      receiptNumber: 0
     };
 
     if (mode === "textfile" || mode === "browser") {
