@@ -1637,6 +1637,41 @@ textarea:focus-visible {
   }
 }
 
+@media (min-width: 1180px) and (max-width: 1320px) and (min-height: 900px) {
+  .category-stack {
+    gap: 0.9rem;
+    padding: 0.85rem;
+  }
+
+  .category-heading h3 {
+    font-size: 1.16rem;
+  }
+
+  .category-dot {
+    width: 1.18rem;
+    height: 1.18rem;
+  }
+
+  .article-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    grid-auto-rows: 7.25rem;
+    gap: 0.65rem;
+  }
+
+  .article-button {
+    min-height: 7.25rem;
+    padding: 0.72rem 0.78rem;
+  }
+
+  .article-name {
+    font-size: clamp(1rem, 0.78rem + 0.42vw, 1.16rem);
+  }
+
+  .article-meta {
+    font-size: 0.82rem;
+  }
+}
+
 @media (min-width: 1700px) {
   .article-grid {
     grid-template-columns: repeat(5, minmax(0, 1fr));

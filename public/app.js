@@ -2,7 +2,7 @@
 // Zielgruppe: Feuerwehren, Vereine und ehrenamtliche Organisationen.
 
 const DEFAULT_RESET_STOCK = 500;
-const MAX_CATEGORIES = 5;
+const MAX_CATEGORIES = 6;
 const SESSION_STORAGE_KEY = "festkasseSessionUser";
 const LAST_RECEIPT_UNDO_MS = 30000;
 const THEME_STORAGE_KEY = "festkasseTheme";
