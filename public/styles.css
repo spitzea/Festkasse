@@ -35,25 +35,27 @@
 }
 
 :root[data-theme="light"] {
-  --bg: #f7fafc;
-  --bg-mid: #eef5f7;
-  --bg-end: #f8f1ee;
-  --bg-accent: rgba(215, 25, 32, 0.12);
+  --bg: #f3f4f6;
+  --bg-mid: #eef0f3;
+  --bg-end: #e9edf2;
+  --bg-accent: rgba(153, 27, 27, 0.06);
   --surface: #ffffff;
-  --panel: rgba(255, 255, 255, 0.94);
-  --panel-strong: #f7f9fb;
+  --panel: #ffffff;
+  --panel-strong: #f9fafb;
   --panel-soft: #ffffff;
-  --topbar-bg: rgba(255, 255, 255, 0.88);
-  --text: #17202a;
-  --muted: #637084;
-  --article-text: #121820;
-  --article-meta-text: #5b3b00;
-  --line: #d3dce7;
-  --line-soft: rgba(0, 0, 0, 0.06);
-  --red-soft: rgba(215, 25, 32, 0.11);
-  --disabled: #d4d6db;
-  --shadow-sm: 0 8px 22px rgba(33, 45, 67, 0.08);
-  --shadow-md: 0 22px 54px rgba(33, 45, 67, 0.13);
+  --topbar-bg: rgba(255, 255, 255, 0.94);
+  --text: #111827;
+  --muted: #6b7280;
+  --article-text: #111827;
+  --article-meta-text: #374151;
+  --line: #d1d5db;
+  --line-soft: rgba(229, 231, 235, 0.92);
+  --red: #b91c1c;
+  --red-dark: #7f1d1d;
+  --red-soft: rgba(185, 28, 28, 0.09);
+  --disabled: #e5e7eb;
+  --shadow-sm: 0 8px 20px rgba(15, 23, 42, 0.08);
+  --shadow-md: 0 18px 42px rgba(15, 23, 42, 0.1);
 }
 
 :root[data-theme="light"] .logo-mark {
@@ -67,14 +69,14 @@
 }
 
 :root[data-theme="light"] .article-button.out {
-  background: #e3e5e9;
-  border-color: #c4c8d0;
-  border-left-color: #9399a4;
-  color: #565b66;
+  background: #e5e7eb;
+  border-color: #d1d5db;
+  border-left-color: #9ca3af;
+  color: #9ca3af;
 }
 
 :root[data-theme="light"] .error {
-  color: #8f1e1e;
+  color: #991b1b;
 }
 
 * {
@@ -611,7 +613,7 @@ textarea:focus-visible {
 
 :root[data-theme="light"] .articles-panel {
   background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.94), rgba(247, 250, 252, 0.96)),
+    linear-gradient(180deg, #ffffff, #f9fafb),
     var(--panel);
 }
 
@@ -629,7 +631,7 @@ textarea:focus-visible {
 :root[data-theme="light"] .history-card,
 :root[data-theme="light"] .category-edit-card,
 :root[data-theme="light"] .article-edit-card {
-  background: rgba(255, 255, 255, 0.94);
+  background: #ffffff;
 }
 
 .contact-box {
