@@ -88,7 +88,7 @@ Nach dem Neustart pruefen:
 
 ```bash
 ls -l /dev/ttyUSB0
-printf '\x1B\x40TEST\r\n\r\n\x1D\x56\x41\x10' > /dev/ttyUSB0
+printf '\x1B\x40TEST\r\n\r\n\x1D\x56\x01' > /dev/ttyUSB0
 ```
 
 In der Festkasse unter **Admin -> Drucken**:

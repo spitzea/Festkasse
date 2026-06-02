@@ -404,33 +404,37 @@ function encodePrinterText(text) {
   return Buffer.from(bytes);
 }
 
-function escposPrintJob(text) {
+function escposPrintBody(text) {
   return Buffer.concat([
     Buffer.from([0x1b, 0x40]),
-    Buffer.from([0x1b, 0x74, 0x13]),
-    encodePrinterText(text),
-    Buffer.from([0x1d, 0x56, 0x01])
+    Buffer.from([0x1b, 0x74, 0x06]),
+    encodePrinterText(text)
   ]);
+}
+
+function escposCut() {
+  return Buffer.from([0x1d, 0x56, 0x01]);
 }
 
 function escposText(text) {
   return encodePrinterText(text);
 }
 
-function escposReceiptJob(receipt, settings) {
+function escposReceiptBody(receipt, settings) {
   const width = 42;
+  const wideWidth = 21;
   const time = receipt.createdAt ? new Date(receipt.createdAt) : new Date();
   const receiptNumber = formatReceiptNumber(receipt.receiptNumber);
-  const articleLines = wrapText(receipt.articleName || "Artikel", width).map((line) => `${centerText(line, width)}\r\n`);
+  const articleLines = wrapText(receipt.articleName || "Artikel", wideWidth).map((line) => `${centerText(line, wideWidth)}\r\n`);
   const chunks = [
     Buffer.from([0x1b, 0x40]),
-    Buffer.from([0x1b, 0x74, 0x13]),
+    Buffer.from([0x1b, 0x74, 0x06]),
     Buffer.from([0x1b, 0x61, 0x01]),
     escposText(`${settings.eventName || "Festkasse"}\r\n`),
     escposText(`${settings.clubName || ""}\r\n`),
     escposText(`${"-".repeat(width)}\r\n\r\n`),
     Buffer.from([0x1b, 0x45, 0x01]),
-    Buffer.from([0x1d, 0x21, 0x01]),
+    Buffer.from([0x1d, 0x21, 0x11]),
     ...articleLines.map(escposText),
     Buffer.from([0x1d, 0x21, 0x00]),
     Buffer.from([0x1b, 0x45, 0x00])
@@ -445,10 +449,13 @@ function escposReceiptJob(receipt, settings) {
   chunks.push(
     escposText(`\r\n${"-".repeat(width)}\r\n`),
     escposText(`Bon #${receiptNumber}  ${receiptDateTimeText(time)}\r\n`),
-    Buffer.from([0x1b, 0x64, 0x03]),
-    Buffer.from([0x1d, 0x56, 0x01])
+    Buffer.from([0x1b, 0x64, 0x04])
   );
   return Buffer.concat(chunks);
+}
+
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 function loadSerialPort() {
@@ -464,7 +471,7 @@ function serialErrorMessage(error, portPath) {
   return `Thermodrucker auf ${portPath} nicht erreichbar${detail}.`;
 }
 
-async function writeSerialPrinter(buffer, settings) {
+async function writeSerialPrinterJobs(jobs, settings) {
   const SerialPort = loadSerialPort();
   const portPath = String(settings.printerPort || defaultSerialPrinterPort).trim() || defaultSerialPrinterPort;
   const serialPort = new SerialPort({
@@ -481,8 +488,15 @@ async function writeSerialPrinter(buffer, settings) {
 
   try {
     await new Promise((resolve, reject) => serialPort.open((error) => (error ? reject(error) : resolve())));
-    await new Promise((resolve, reject) => serialPort.write(buffer, (error) => (error ? reject(error) : resolve())));
-    await new Promise((resolve, reject) => serialPort.drain((error) => (error ? reject(error) : resolve())));
+    for (const job of jobs) {
+      if (job.delayMs) {
+        await sleep(job.delayMs);
+      }
+      if (job.buffer?.length) {
+        await new Promise((resolve, reject) => serialPort.write(job.buffer, (error) => (error ? reject(error) : resolve())));
+        await new Promise((resolve, reject) => serialPort.drain((error) => (error ? reject(error) : resolve())));
+      }
+    }
   } catch (error) {
     throw Object.assign(new Error(serialErrorMessage(error, portPath)), { status: 503, cause: error });
   } finally {
@@ -492,14 +506,28 @@ async function writeSerialPrinter(buffer, settings) {
   }
 }
 
+async function writeSerialPrinter(buffer, settings) {
+  await writeSerialPrinterJobs([{ buffer }], settings);
+}
+
 async function printReceiptsSerial(receipts, settings) {
-  const jobs = (Array.isArray(receipts) ? receipts : []).map((receipt) => escposReceiptJob(receipt, settings));
+  const receiptsList = Array.isArray(receipts) ? receipts : [];
+  const jobs = receiptsList.flatMap((receipt, index) => [
+    { buffer: escposReceiptBody(receipt, settings) },
+    { delayMs: 900 },
+    { buffer: escposCut() },
+    ...(index < receiptsList.length - 1 ? [{ delayMs: 250 }] : [])
+  ]);
   if (!jobs.length) return;
-  await writeSerialPrinter(Buffer.concat(jobs), settings);
+  await writeSerialPrinterJobs(jobs, settings);
 }
 
 async function printReportSerial(report, settings) {
-  await writeSerialPrinter(escposPrintJob(formatReportText(report, settings)), settings);
+  await writeSerialPrinterJobs([
+    { buffer: escposPrintBody(formatReportText(report, settings)) },
+    { delayMs: 900 },
+    { buffer: escposCut() }
+  ], settings);
 }
 
 async function printerStatus(settings) {

@@ -137,7 +137,7 @@ Im Bereich **Drucken** kann der Druckmodus gesetzt werden:
 
 Tagesauswertungen und historische Tagesabschluesse nutzen dieselbe zentrale Druckeinstellung.
 
-Fuer den seriellen Thermodrucker wird kein CUPS, `lp`, `lpr` oder System-Druckdialog verwendet. Die getestete Grundkonfiguration ist `9600 8N1` mit XON/XOFF-Flusskontrolle. Jeder Bon wird mit `ESC @` initialisiert und nach dem Druck mit `GS V A 16` teilweise geschnitten.
+Fuer den seriellen Thermodrucker wird kein CUPS, `lp`, `lpr` oder System-Druckdialog verwendet. Die getestete Grundkonfiguration ist `9600 8N1` mit XON/XOFF-Flusskontrolle. Jeder Bon wird mit `ESC @` initialisiert, vorgeschoben und danach mit `GS V 01` teilweise geschnitten.
 
 ## Haftungsausschluss
 
