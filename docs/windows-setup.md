@@ -1,29 +1,29 @@
-# Windows Setup
+# Einrichtung unter Windows
 
-Diese Anleitung richtet die Festkasse auf einem Windows-Rechner ein.
+Diese Anleitung beschreibt die Installation und den Betrieb der Festkasse auf
+einem Windows-Rechner.
 
 ## Voraussetzungen
 
 - Windows 10 oder Windows 11
-- Browser: Microsoft Edge, Google Chrome oder Chromium
-- Node.js 18.17 oder hoeher, empfohlen Node.js 20 LTS
-- Optional: Git for Windows, wenn das Projekt direkt aus GitHub geholt oder aktualisiert werden soll
+- Moderner Browser wie Microsoft Edge, Google Chrome oder Chromium
+- Node.js 18.17 oder neuer, empfohlen wird eine aktuelle LTS-Version
+- Optional Git for Windows, um das Repository über GitHub herunterzuladen und
+  zu aktualisieren
 
-## Programme installieren
+## Erforderliche Programme installieren
 
-Node.js LTS installieren:
+Node.js steht auf der offiziellen Website zum Download bereit:
 
-```text
-https://nodejs.org/
-```
+[Node.js herunterladen](https://nodejs.org/)
 
-Git for Windows installieren, wenn das Repo per Git geklont oder aktualisiert werden soll:
+Git for Windows wird nur benötigt, wenn das Repository mit Git heruntergeladen
+oder aktualisiert werden soll:
 
-```text
-https://git-scm.com/download/win
-```
+[Git for Windows herunterladen](https://git-scm.com/download/win)
 
-Prüfen:
+Nach der Installation können die verfügbaren Versionen in PowerShell überprüft
+werden:
 
 ```powershell
 node --version
@@ -31,20 +31,20 @@ npm --version
 git --version
 ```
 
-`git --version` ist nur nötig, wenn Git verwendet wird.
+`git --version` ist nur erforderlich, wenn Git installiert wurde.
 
-## Festkasse holen
+## Repository herunterladen oder aktualisieren
 
-Wenn das Repo noch nicht geklont ist:
+Erstinstallation:
 
 ```powershell
 cd $HOME\Documents
-git clone <repository-url>
+git clone https://github.com/spitzea/Festkasse.git
 cd Festkasse
 npm install
 ```
 
-Wenn das Repo schon vorhanden ist:
+Vorhandene Installation aktualisieren:
 
 ```powershell
 cd <pfad-zur-festkasse>
@@ -52,36 +52,38 @@ git pull
 npm install
 ```
 
-`npm install` installiert die in `package.json` definierten Pakete, unter anderem `serialport` fuer den direkten seriellen Thermodrucker.
+`npm install` installiert die in `package.json` definierten Pakete, darunter
+`serialport` für die direkte Ansteuerung eines seriellen Thermodruckers.
 
-## Starten
+## Anwendung starten
 
-Variante 1: per Batch-Datei:
+Start über die mitgelieferte Batch-Datei:
 
 ```powershell
 .\start-festkasse.bat
 ```
 
-Variante 2: per npm:
+Alternativ kann die Anwendung mit npm gestartet werden:
 
 ```powershell
 npm start
 ```
 
-Danach im Browser öffnen:
+Die Benutzeroberfläche ist anschließend unter folgender Adresse erreichbar:
 
 ```text
 http://localhost:3000
 ```
 
-Wenn der Port 3000 schon belegt ist, zeigt die Festkasse beim Start eine Meldung. Dann das andere Programm beenden oder die Festkasse mit einem anderen Port starten:
+Ist Port `3000` bereits belegt, kann entweder die andere Anwendung beendet oder
+für die Festkasse ein abweichender Port festgelegt werden:
 
 ```powershell
 $env:PORT="3001"
 npm start
 ```
 
-Adresse im Browser:
+Die Benutzeroberfläche ist dann unter folgender Adresse erreichbar:
 
 ```text
 http://localhost:3001
@@ -89,26 +91,31 @@ http://localhost:3001
 
 ## Drucken
 
-Für Browserdruck ist kein zusätzliches Paket nötig.
+Für den Browserdruck ist keine zusätzliche Software erforderlich.
 
-Für TXT-Testdruck schreibt die Festkasse Dateien nach:
+Beim TXT-Testdruck speichert die Festkasse die erzeugten Dateien im folgenden
+Verzeichnis:
 
 ```text
 data/prints
 ```
 
-Für einen seriellen Thermodrucker wird später der passende Windows-Port in der App eingetragen, zum Beispiel:
+Für einen seriellen Thermodrucker muss im Administrationsbereich der
+entsprechende Windows-Port eingetragen werden, beispielsweise:
 
 ```text
 COM3
 ```
 
-## Daten
+## Datenspeicherung
 
-Die aktiven Daten liegen im Projektordner unter:
+Die Daten der aktuell geladenen Veranstaltung werden in folgender Datei
+gespeichert:
 
 ```text
 data/active-event.json
 ```
 
-Gespeicherte Vorlagen und Testdrucke liegen ebenfalls unter `data`. Den Projektordner deshalb nicht in einen schreibgeschützten Bereich legen.
+Gespeicherte Vorlagen und Testdrucke befinden sich ebenfalls im Verzeichnis
+`data`. Der Projektordner muss daher an einem Ort liegen, für den der
+Windows-Benutzer Schreibrechte besitzt.

@@ -1,13 +1,16 @@
-# Raspberry Pi Kiosk Setup
+# Einrichtung als Raspberry-Pi-Kiosk
 
-Diese Anleitung richtet einen Raspberry Pi mit Raspberry Pi OS Lite als lokale Festkasse ein: Node-Server, Chromium-Kiosk auf dem angeschlossenen Monitor und Herunterfahren aus der App.
+Diese Anleitung beschreibt die Einrichtung eines Raspberry Pi mit Raspberry Pi
+OS Lite als lokale Festkasse. Sie umfasst den Node.js-Server, Chromium im
+Kiosk-Modus auf einem angeschlossenen Monitor und das Herunterfahren über die
+Anwendung.
 
 ## Voraussetzungen
 
 - Raspberry Pi OS Lite ist installiert.
 - SSH ist aktiviert.
-- Die Beispiele verwenden den aktuell angemeldeten Linux-Benutzer über `$USER`.
-- Das Repo wird unter `$HOME/Festkasse` geklont.
+- Die Beispiele verwenden den aktuell angemeldeten Linux-Benutzer.
+- Das Repository wird unter `$HOME/Festkasse` gespeichert.
 
 ## System aktualisieren
 
@@ -17,7 +20,7 @@ sudo apt full-upgrade -y
 sudo reboot
 ```
 
-Nach dem Neustart wieder per SSH oder lokal anmelden.
+Melden Sie sich nach dem Neustart erneut über SSH oder direkt am Gerät an.
 
 ## Pakete installieren
 
@@ -33,7 +36,7 @@ Chromium installieren:
 sudo apt install -y --no-install-recommends chromium
 ```
 
-Prüfen:
+Installation überprüfen:
 
 ```bash
 node --version
@@ -48,18 +51,18 @@ command -v numlockx
 python3 -c "import xdg; print('pyxdg OK')"
 ```
 
-## Festkasse holen
+## Repository herunterladen oder aktualisieren
 
-Wenn das Repo noch nicht geklont ist:
+Erstinstallation:
 
 ```bash
 cd ~
-git clone <repository-url>
+git clone https://github.com/spitzea/Festkasse.git
 cd Festkasse
 npm install
 ```
 
-Wenn das Repo schon vorhanden ist:
+Vorhandene Installation aktualisieren:
 
 ```bash
 cd ~/Festkasse
@@ -67,7 +70,7 @@ git pull
 npm install
 ```
 
-## Thermodrucker per USB-RS232
+## Thermodrucker über USB-RS232
 
 Getestete Konfiguration:
 
@@ -75,30 +78,30 @@ Getestete Konfiguration:
 - Baudrate: `9600`
 - Datenformat: `8N1`
 - Flusskontrolle: XON/XOFF
-- Druckprotokoll: ESC/POS direkt ueber `serialport`
+- Druckprotokoll: ESC/POS direkt über `serialport`
 
-Der Linux-Benutzer muss auf den seriellen Port zugreifen duerfen:
+Der Linux-Benutzer benötigt Zugriff auf den seriellen Port:
 
 ```bash
 sudo usermod -aG dialout $(whoami)
 sudo reboot
 ```
 
-Nach dem Neustart pruefen:
+Verbindung nach dem Neustart überprüfen:
 
 ```bash
 ls -l /dev/ttyUSB0
 printf '\x1B\x40TEST\r\n\r\n\x1D\x56\x01' > /dev/ttyUSB0
 ```
 
-In der Festkasse unter **Admin -> Drucken**:
+Anschließend unter **Admin > Drucken** konfigurieren:
 
 - Druckmodus: `Serieller Thermodrucker`
 - Drucker-Port: `/dev/ttyUSB0`
 - Speichern
 - `Testbon schreiben`
 
-## Festkasse-Service
+## Systemdienst für die Festkasse
 
 ```bash
 sudo nano /etc/systemd/system/festkasse.service
@@ -124,9 +127,10 @@ Environment=PORT=3000
 WantedBy=multi-user.target
 ```
 
-`<linux-user>` durch den tatsächlichen Linux-Benutzernamen ersetzen, zum Beispiel den Wert aus `whoami`.
+Ersetzen Sie `<linux-user>` durch den tatsächlichen Linux-Benutzernamen. Dieser
+kann mit `whoami` ermittelt werden.
 
-Aktivieren:
+Dienst aktivieren und starten:
 
 ```bash
 sudo systemctl daemon-reload
@@ -135,15 +139,17 @@ sudo systemctl start festkasse
 sudo systemctl status festkasse
 ```
 
-Test:
+Erreichbarkeit überprüfen:
 
 ```bash
 curl http://localhost:3000
 ```
 
-## Kiosk-Start
+## Kiosk-Modus konfigurieren
 
-Chromium-Reload-Tasten wie F5 können im Kiosk-Modus auf manchen Raspberry-Pi/Chromium-Kombinationen zu einem schwarzen Bildschirm führen. F5 wird deshalb in der X-Sitzung deaktiviert. Für den Nummernblock wird NumLock beim Start aktiviert.
+Die Taste F5 kann im Kiosk-Modus bei bestimmten Kombinationen aus Raspberry Pi
+und Chromium zu einem schwarzen Bildschirm führen. Sie wird deshalb in der
+X-Sitzung deaktiviert. NumLock wird beim Start für den Nummernblock aktiviert.
 
 ```bash
 nano ~/.xinitrc
@@ -179,15 +185,15 @@ while true; do
 done
 ```
 
-Manuell testen:
+Kiosk-Modus manuell testen:
 
 ```bash
 startx
 ```
 
-## Autologin
+## Automatische Anmeldung
 
-Autologin per systemd setzen:
+Automatische Anmeldung über systemd konfigurieren:
 
 ```bash
 sudo mkdir -p /etc/systemd/system/getty@tty1.service.d
@@ -202,18 +208,19 @@ ExecStart=
 ExecStart=-/sbin/agetty --autologin <linux-user> --noclear %I $TERM
 ```
 
-`<linux-user>` wieder durch den tatsächlichen Linux-Benutzernamen ersetzen.
+Ersetzen Sie `<linux-user>` erneut durch den tatsächlichen
+Linux-Benutzernamen.
 
-Aktivieren:
+Konfiguration übernehmen und überprüfen:
 
 ```bash
 sudo systemctl daemon-reload
 sudo systemctl cat getty@tty1.service
 ```
 
-In der Ausgabe muss der Override `autologin.conf` sichtbar sein.
+In der Ausgabe muss die Überschreibungsdatei `autologin.conf` aufgeführt sein.
 
-## Startx nach Login
+## Grafische Oberfläche nach der Anmeldung starten
 
 ```bash
 nano ~/.bash_profile
@@ -230,13 +237,21 @@ if [ -z "$DISPLAY" ] && [ "$(tty)" = "/dev/tty1" ]; then
 fi
 ```
 
-Damit startet Chromium neu, wenn nur der Browser beendet wurde. Wenn die ganze X-Sitzung beendet wurde, startet `startx` nach kurzer Pause wieder. Das erschwert das Ausbrechen aus dem Kiosk-Betrieb deutlich; der vorgesehene Weg zum Beenden bleibt der Shutdown-Button in der Festkasse.
+Chromium wird neu gestartet, wenn nur der Browser beendet wurde. Nach dem Ende
+der gesamten X-Sitzung startet `startx` nach kurzer Pause erneut. Der
+vorgesehene Weg zum Beenden des Systems bleibt die Schaltfläche zum
+Herunterfahren in der Festkasse.
 
-Hinweis: Mit physischem Zugriff auf Tastatur, SD-Karte/SSD oder SSH lässt sich ein Linux-System nie absolut abschließen. Für den Festbetrieb sollte der Kiosk-Benutzer keine unnötigen sudo-Rechte bekommen. Passwortloses sudo sollte nur für `/usr/sbin/shutdown` gesetzt werden.
+> **Sicherheitshinweis:** Mit physischem Zugriff auf Tastatur, Datenträger oder
+> SSH lässt sich ein Linux-System nicht vollständig absichern. Der
+> Kiosk-Benutzer sollte keine unnötigen `sudo`-Berechtigungen erhalten. Eine
+> passwortlose Ausführung sollte ausschließlich für `/usr/sbin/shutdown`
+> eingerichtet werden.
 
-## Shutdown aus der App
+## Herunterfahren über die Anwendung
 
-Damit der Button **Raspberry herunterfahren** ohne Passwort funktioniert:
+Damit die Schaltfläche **Raspberry herunterfahren** ohne Passwortabfrage
+funktioniert:
 
 ```bash
 sudo visudo -f /etc/sudoers.d/festkasse-shutdown
@@ -248,30 +263,32 @@ Inhalt:
 <linux-user> ALL=(root) NOPASSWD: /usr/sbin/shutdown
 ```
 
-Auch hier `<linux-user>` durch den tatsächlichen Linux-Benutzernamen ersetzen.
+Ersetzen Sie auch hier `<linux-user>` durch den tatsächlichen
+Linux-Benutzernamen.
 
-Prüfen:
+Berechtigung überprüfen:
 
 ```bash
 sudo -n /usr/sbin/shutdown --help >/dev/null && echo OK
 ```
 
-## Neustart und Test
+## Einrichtung abschließen und überprüfen
 
 ```bash
 sudo reboot
 ```
 
-Nach dem Neustart sollte der Raspberry automatisch einloggen, `startx` starten und Chromium im Kiosk-Modus mit Festkasse öffnen.
+Nach dem Neustart sollte sich der Raspberry Pi automatisch anmelden, `startx`
+ausführen und die Festkasse in Chromium im Kiosk-Modus öffnen.
 
-Wenn nur der Login-Prompt erscheint:
+Fehleranalyse, wenn nur die Anmeldeaufforderung erscheint:
 
 ```bash
 sudo systemctl cat getty@tty1.service
 cat ~/.bash_profile
 ```
 
-Wenn Login funktioniert, aber kein Browser startet:
+Fehleranalyse, wenn die Anmeldung funktioniert, aber Chromium nicht startet:
 
 ```bash
 startx
