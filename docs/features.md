@@ -50,5 +50,7 @@ System-Druckdialog benötigt.
 - Versions- und Systeminformationen zur Fehleranalyse
 - Raspberry-Pi-Kiosk mit automatischem Start und optionalem
   Herunterfahren-Button
+- Systemzeit direkt im Adminbereich korrigierbar (nur Linux, z. B. bei
+  Betrieb ohne Internet und damit ohne NTP)
 
 [Zurück zur README](../README.md)

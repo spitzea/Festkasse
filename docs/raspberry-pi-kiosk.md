@@ -272,6 +272,38 @@ Berechtigung überprüfen:
 sudo -n /usr/sbin/shutdown --help >/dev/null && echo OK
 ```
 
+## Systemzeit über die Anwendung korrigieren
+
+Läuft der Pi ohne Internetzugang, funktioniert NTP nicht und die Systemuhr
+kann nachgehen. Im Adminbereich unter **Einstellungen > Systemzeit** lässt
+sich die Uhrzeit direkt aus der Festkasse heraus korrigieren (nur unter
+Linux sichtbar). Damit das ohne Passwortabfrage funktioniert:
+
+```bash
+sudo visudo -f /etc/sudoers.d/festkasse-datetime
+```
+
+Inhalt:
+
+```text
+<linux-user> ALL=(root) NOPASSWD: /bin/date
+```
+
+Ersetzen Sie auch hier `<linux-user>` durch den tatsächlichen
+Linux-Benutzernamen.
+
+Berechtigung überprüfen:
+
+```bash
+sudo -n /bin/date --help >/dev/null && echo OK
+```
+
+> **Hinweis:** Eine Zeitkorrektur ändert nur das Systemdatum, nicht
+> gespeicherte Buchungszeitpunkte. Bereits an diesem Tag gespeicherte
+> Buchungen können danach in der Tagesauswertung falsch einsortiert
+> erscheinen. Die Uhrzeit sollte daher möglichst vor dem ersten Bon des
+> Tages korrigiert werden.
+
 ## Einrichtung abschließen und überprüfen
 
 ```bash

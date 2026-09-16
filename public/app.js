@@ -53,6 +53,7 @@ let bootError = "";
 let systemInfo = {
   platform: "",
   canShutdown: false,
+  canSetSystemTime: false,
   appVersion: "",
   gitCommit: "",
   nodeVersion: "",
@@ -486,6 +487,17 @@ function shellTemplate() {
 
 function canShutdownSystem() {
   return Boolean(systemInfo.canShutdown);
+}
+
+function canSetSystemTime() {
+  return Boolean(systemInfo.canSetSystemTime);
+}
+
+function toDateTimeLocalValue(isoString) {
+  const date = isoString ? new Date(isoString) : new Date();
+  if (Number.isNaN(date.getTime())) return "";
+  const pad = (value) => String(value).padStart(2, "0");
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
 }
 
 function defaultAccessTemplate() {
@@ -1000,6 +1012,29 @@ function settingsTemplate() {
         </div>
       </form>
     </section>
+    ${canSetSystemTime() ? systemTimeTemplate() : ""}
+  `;
+}
+
+function systemTimeTemplate() {
+  const todayCount = todayOrders().length;
+  return `
+    <section class="panel">
+      <div class="panel-header">
+        <div>
+          <h2>Systemzeit</h2>
+          <p>Nur relevant, wenn der Pi ohne Internet läuft und die Uhr nachgeht/vorgeht.</p>
+        </div>
+      </div>
+      <form class="settings-form" data-system-time-form>
+        <div class="field">
+          <label>Aktuelle Systemzeit</label>
+          <input type="datetime-local" name="dateTime" value="${toDateTimeLocalValue(systemInfo.serverTime)}" required />
+        </div>
+        ${todayCount > 0 ? `<p class="hint">Achtung: Es sind bereits ${todayCount} Buchung(en) mit dem aktuellen Datum gespeichert. Nach einer Korrektur können diese aus der Tagesauswertung herausfallen oder falsch einsortiert werden.</p>` : ""}
+        <button class="action-button" type="submit">Uhrzeit setzen</button>
+      </form>
+    </section>
   `;
 }
 
@@ -1482,6 +1517,7 @@ function bindAdmin() {
   document.querySelectorAll("[data-password-user]").forEach((formElement) => {
     formElement.addEventListener("submit", setUserPassword);
   });
+  document.querySelector("[data-system-time-form]")?.addEventListener("submit", setSystemDateTime);
   document.querySelectorAll("[data-template-event]").forEach((button) => {
     button.addEventListener("click", () => loadManagedEvent(button.dataset.templateEvent, "template"));
   });
@@ -2293,6 +2329,42 @@ async function shutdownSystem() {
     return;
   }
   showToast("Raspberry wird heruntergefahren.");
+}
+
+async function setSystemDateTime(event) {
+  event.preventDefault();
+  const form = new FormData(event.currentTarget);
+  const dateTime = form.get("dateTime");
+  if (!dateTime) return;
+
+  const todayCount = todayOrders().length;
+  const warning = todayCount > 0
+    ? `\n\nAchtung: ${todayCount} Buchung(en) mit dem aktuellen Datum sind bereits gespeichert und können danach falsch einsortiert sein.`
+    : "";
+  if (!window.confirm(`Systemzeit wirklich ändern?${warning}`)) return;
+
+  const submitter = event.submitter;
+  const finishButton = setButtonState(submitter, "Setze...");
+  const response = await apiFetch("/api/system/datetime", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ dateTime })
+  });
+  const payload = await response.json().catch(() => ({}));
+
+  if (!response.ok) {
+    finishButton();
+    showToast(payload.error || "Uhrzeit konnte nicht gesetzt werden.");
+    return;
+  }
+
+  systemInfo = { ...systemInfo, serverTime: payload.serverTime || systemInfo.serverTime };
+  finishButton("Gesetzt");
+  showToast("Systemzeit gesetzt.");
+  window.setTimeout(() => finishButton(), 1200);
+  if (activeView === "admin" && activeAdminSection === "settings") {
+    renderAdmin();
+  }
 }
 
 function resetDayCash() {

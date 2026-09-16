@@ -753,6 +753,7 @@ function systemInfo(state = {}) {
   return {
     platform: process.platform,
     canShutdown: process.platform === "linux",
+    canSetSystemTime: process.platform === "linux",
     appVersion: readPackageVersion(),
     gitCommit: readGitCommit(),
     nodeVersion: process.version,
@@ -831,6 +832,20 @@ function shutdownSystem() {
     execFile("sudo", ["shutdown", "-h", "now"], (error) => {
       if (error) {
         reject(Object.assign(new Error("Herunterfahren fehlgeschlagen. Bitte sudo-Rechte für shutdown prüfen."), { status: 500 }));
+        return;
+      }
+      resolve();
+    });
+  });
+}
+
+function setSystemTimeLinux(date) {
+  const pad = (value) => String(value).padStart(2, "0");
+  const formatted = `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`;
+  return new Promise((resolve, reject) => {
+    execFile("sudo", ["date", "-s", formatted], (error) => {
+      if (error) {
+        reject(Object.assign(new Error("Uhrzeit konnte nicht gesetzt werden. Bitte sudo-Rechte für date prüfen."), { status: 500 }));
         return;
       }
       resolve();
@@ -1084,6 +1099,31 @@ async function handleApi(req, res, urlPath) {
     }
     sendJson(res, 202, { ok: true });
     shutdownSystem().catch((error) => console.error(error.message));
+    return;
+  }
+
+  if (req.method === "POST" && urlPath === "/api/system/datetime") {
+    const session = requireAdminSession(req, res);
+    if (!session) return;
+    if (process.platform !== "linux") {
+      sendJson(res, 400, { error: "Uhrzeit setzen ist nur auf Linux aktiviert." });
+      return;
+    }
+    const body = await readBody(req);
+    const parsed = new Date(body.dateTime);
+    if (Number.isNaN(parsed.getTime())) {
+      sendJson(res, 400, { error: "Ungültiges Datum/Uhrzeit." });
+      return;
+    }
+    try {
+      await setSystemTimeLinux(parsed);
+    } catch (error) {
+      sendError(res, error);
+      return;
+    }
+    // Eigene Session an die neue Uhrzeit anpassen, damit man sich nicht selbst aussperrt.
+    session.expiresAt = Date.now() + SESSION_TTL_MS;
+    sendJson(res, 200, { ok: true, serverTime: new Date().toISOString() });
     return;
   }
 
