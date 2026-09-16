@@ -32,8 +32,11 @@ http://localhost:3000
 ```
 
 Die Anwendung muss über den Node.js-Server aufgerufen werden, damit Daten
-zentral in JSON-Dateien gespeichert und von mehreren Browsern oder Geräten im
-gleichen Netzwerk genutzt werden können.
+zentral in JSON-Dateien gespeichert werden. Sie ist von jedem Browser oder
+Gerät im gleichen Netzwerk erreichbar; angemeldet sein kann jeweils aber nur
+eine Sitzung gleichzeitig, damit sich Buchungen von mehreren Kassen nicht
+gegenseitig überschreiben. Meldet sich ein weiteres Gerät an, kann es die
+aktive Sitzung nach Rückfrage übernehmen.
 
 Wenn Port `3000` bereits belegt ist, kann ein anderer Port verwendet werden:
 

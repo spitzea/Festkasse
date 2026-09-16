@@ -28,8 +28,10 @@ ehrenamtliche Veranstaltungen.
 
 Festkasse ist eine lokale Webanwendung für einfache Verkaufs- und
 Kassensituationen bei Veranstaltungen. Sie läuft über einen Node.js-Server und
-kann dadurch von mehreren Browsern oder Geräten im gleichen Netzwerk verwendet
-werden.
+ist dadurch von jedem Browser oder Gerät im gleichen Netzwerk erreichbar. Um
+widersprüchliche gleichzeitige Buchungen zu vermeiden, kann jeweils nur eine
+Sitzung aktiv angemeldet sein; ein neues Gerät kann die aktive Sitzung mit
+Rückfrage übernehmen.
 
 Die Anwendung richtet sich insbesondere an:
 

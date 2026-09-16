@@ -39,6 +39,7 @@ const seedData = {
 
 let state = cloneData(seedData);
 let sessionUser = null;
+let sessionToken = null;
 let activeView = "cashier";
 let activeAdminSection = "analysis";
 let cart = [];
@@ -87,8 +88,51 @@ function setThemeMode(mode) {
 
 applyTheme(themeMode);
 
+function escapeHtml(value) {
+  return String(value ?? "").replace(/[&<>"']/g, (char) => (
+    { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[char]
+  ));
+}
+
+function safeColor(value) {
+  return /^#[0-9a-f]{3,8}$/i.test(String(value || "")) ? value : "#999999";
+}
+
+function safeLogoSrc(value) {
+  return /^data:image\//i.test(String(value || "")) ? escapeHtml(value) : "";
+}
+
+async function apiFetch(input, init = {}) {
+  if (!sessionToken) return fetch(input, init);
+  const headers = new Headers(init.headers || {});
+  headers.set("Authorization", `Bearer ${sessionToken}`);
+  const response = await fetch(input, { ...init, headers });
+  if (response.status === 401) {
+    const payload = await response.clone().json().catch(() => ({}));
+    handleSessionInvalidated(
+      payload.reason === "taken-over"
+        ? "Diese Sitzung wurde auf einem anderen Gerät übernommen. Bitte erneut anmelden."
+        : "Sitzung abgelaufen oder Server neu gestartet. Bitte erneut anmelden."
+    );
+  }
+  return response;
+}
+
+let sessionInvalidatedHandled = false;
+let loginNotice = "";
+
+function handleSessionInvalidated(message) {
+  if (sessionInvalidatedHandled || !sessionUser) return;
+  sessionInvalidatedHandled = true;
+  clearSessionUser();
+  cart = [];
+  paidAmount = "";
+  loginNotice = message;
+  render();
+}
+
 async function loadState() {
-  const response = await fetch("/api/state");
+  const response = await apiFetch("/api/state");
   if (!response.ok) throw new Error("Serverdaten konnten nicht geladen werden.");
   const payload = await response.json();
   systemInfo = { ...systemInfo, ...(payload.system || {}) };
@@ -97,7 +141,7 @@ async function loadState() {
 
 async function refreshSystemInfo() {
   try {
-    const response = await fetch(`/api/system?t=${Date.now()}`, { cache: "no-store" });
+    const response = await apiFetch(`/api/system?t=${Date.now()}`, { cache: "no-store" });
     if (!response.ok) return;
     const payload = await response.json();
     systemInfo = { ...systemInfo, ...(payload.system || {}) };
@@ -158,7 +202,7 @@ function normalizeCategories(categories, articles) {
 }
 
 async function saveState() {
-  const response = await fetch("/api/state", {
+  const response = await apiFetch("/api/state", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ state })
@@ -303,8 +347,10 @@ function restoreSessionUser() {
       user.role === storedUser.role
     );
     sessionUser = matchingUser || null;
+    sessionToken = sessionUser ? storedUser.token || null : null;
   } catch (error) {
     sessionUser = null;
+    sessionToken = null;
   }
 
   if (!sessionUser) {
@@ -317,12 +363,14 @@ function rememberSessionUser() {
   window.sessionStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify({
     id: sessionUser.id,
     username: sessionUser.username,
-    role: sessionUser.role
+    role: sessionUser.role,
+    token: sessionToken
   }));
 }
 
 function clearSessionUser() {
   sessionUser = null;
+  sessionToken = null;
   window.sessionStorage.removeItem(SESSION_STORAGE_KEY);
 }
 
@@ -365,14 +413,16 @@ function updateFavicon() {
 }
 
 function loginTemplate() {
+  const notice = loginNotice;
+  loginNotice = "";
   return `
     <main class="login-screen">
       <section class="panel login-card">
         <div class="brand">
           ${brandMarkTemplate()}
           <div>
-            <h1>${state.settings.eventName}</h1>
-            <p>${state.settings.clubName}</p>
+            <h1>${escapeHtml(state.settings.eventName)}</h1>
+            <p>${escapeHtml(state.settings.clubName)}</p>
           </div>
         </div>
         <form class="login-form" data-login-form>
@@ -387,11 +437,11 @@ function loginTemplate() {
           <button class="primary-button" type="submit">Einloggen</button>
           ${systemInfo.defaultPasswordsActive === true ? defaultAccessTemplate() : ""}
           <div class="login-contact">
-            <strong>Rechner: ${state.settings.calculatorName || "-"}</strong>
-            <span>Telefonnummer: ${state.settings.calculatorPhone || "-"}</span>
-            ${state.settings.calculatorComment ? `<p>${state.settings.calculatorComment}</p>` : ""}
+            <strong>Rechner: ${escapeHtml(state.settings.calculatorName || "-")}</strong>
+            <span>Telefonnummer: ${escapeHtml(state.settings.calculatorPhone || "-")}</span>
+            ${state.settings.calculatorComment ? `<p>${escapeHtml(state.settings.calculatorComment)}</p>` : ""}
           </div>
-          <div class="error hidden" data-login-error>Login fehlgeschlagen.</div>
+          <div class="error ${notice ? "" : "hidden"}" data-login-error>${escapeHtml(notice || "Login fehlgeschlagen.")}</div>
         </form>
         ${canShutdownSystem() ? `<button class="ghost-button small-button login-shutdown-button" type="button" data-system-shutdown>Herunterfahren</button>` : ""}
       </section>
@@ -406,8 +456,8 @@ function shellTemplate() {
         <div class="brand">
           ${brandMarkTemplate()}
           <div>
-            <h1>${state.settings.eventName}</h1>
-            <p>${state.settings.clubName}</p>
+            <h1>${escapeHtml(state.settings.eventName)}</h1>
+            <p>${escapeHtml(state.settings.clubName)}</p>
           </div>
         </div>
         <div class="top-actions">
@@ -481,8 +531,9 @@ function themeMenuTemplate() {
 }
 
 function brandMarkTemplate() {
-  if (state.settings.logoDataUrl) {
-    return `<div class="brand-mark logo-mark"><img src="${state.settings.logoDataUrl}" alt="Logo" /></div>`;
+  const logoSrc = safeLogoSrc(state.settings.logoDataUrl);
+  if (logoSrc) {
+    return `<div class="brand-mark logo-mark"><img src="${logoSrc}" alt="Logo" /></div>`;
   }
 
   return `<div class="brand-mark">Logo</div>`;
@@ -518,10 +569,10 @@ function renderCashier() {
 function categoryGroupTemplate(category, articles) {
   const color = getCategoryColor(category);
   return `
-    <section class="category-group" style="--category-color: ${color}">
+    <section class="category-group" style="--category-color: ${safeColor(color)}">
       <div class="category-heading">
         <span class="category-dot"></span>
-        <h3>${category}</h3>
+        <h3>${escapeHtml(category)}</h3>
       </div>
       <div class="article-grid">
         ${articles.map(articleButtonTemplate).join("")}
@@ -534,8 +585,8 @@ function articleButtonTemplate(article) {
   const out = article.stock <= 0;
   const low = !out && article.stock <= article.warningStock;
   return `
-    <button class="article-button ${low ? "low" : ""} ${out ? "out" : ""}" style="--category-color: ${getCategoryColor(article.category)}" data-add-article="${article.id}" ${out ? "disabled" : ""}>
-      <span class="article-name">${article.name}</span>
+    <button class="article-button ${low ? "low" : ""} ${out ? "out" : ""}" style="--category-color: ${safeColor(getCategoryColor(article.category))}" data-add-article="${escapeHtml(article.id)}" ${out ? "disabled" : ""}>
+      <span class="article-name">${escapeHtml(article.name)}</span>
       <span class="article-meta">
         <span>${money(article.price)}</span>
         <span data-article-stock>${out ? "Ausverkauft" : `${article.stock} Stk.`}</span>
@@ -607,10 +658,10 @@ function cashierContactTemplate() {
   return `
     <aside class="panel contact-box">
       <span>Rechner</span>
-      <strong>${state.settings.calculatorName || "-"}</strong>
+      <strong>${escapeHtml(state.settings.calculatorName || "-")}</strong>
       <span>Telefonnummer</span>
-      <strong>${state.settings.calculatorPhone || "-"}</strong>
-      ${state.settings.calculatorComment ? `<span>Hinweis</span><p>${state.settings.calculatorComment}</p>` : ""}
+      <strong>${escapeHtml(state.settings.calculatorPhone || "-")}</strong>
+      ${state.settings.calculatorComment ? `<span>Hinweis</span><p>${escapeHtml(state.settings.calculatorComment)}</p>` : ""}
     </aside>
   `;
 }
@@ -623,7 +674,7 @@ function cashierStatusTemplate() {
       <strong data-clock>${cashierDateTime()}</strong>
       <span class="printer-state ${online ? "online" : "offline"}" data-printer-status>
         <span class="printer-dot"></span>
-        ${label}
+        ${escapeHtml(label)}
       </span>
     </aside>
   `;
@@ -633,7 +684,7 @@ function cartRowTemplate(item) {
   return `
     <div class="cart-row">
       <div class="cart-item-info">
-        <strong>${item.name}</strong>
+        <strong>${escapeHtml(item.name)}</strong>
         <span>${item.quantity} x ${money(item.unitPrice)} = ${money(item.quantity * item.unitPrice)}</span>
       </div>
       <div class="cart-controls">
@@ -725,7 +776,7 @@ function articleManagementTemplate() {
 
 function categoryOptionsTemplate(selectedCategory = "") {
   return state.settings.categories.map((category) =>
-    `<option value="${category.name}" ${category.name === selectedCategory ? "selected" : ""}>${category.name}</option>`
+    `<option value="${escapeHtml(category.name)}" ${category.name === selectedCategory ? "selected" : ""}>${escapeHtml(category.name)}</option>`
   ).join("");
 }
 
@@ -757,17 +808,17 @@ function categoryManagementTemplate() {
       ${categoryLimitReached ? `<p class="category-limit-note">Maximal ${MAX_CATEGORIES} Kategorien sind erlaubt, damit die Kassenansicht ruhig und planbar bleibt.</p>` : ""}
       <div class="category-list">
         ${state.settings.categories.map((category) => `
-          <form class="category-edit-card" data-edit-category="${category.name}" style="--category-color: ${category.color}">
+          <form class="category-edit-card" data-edit-category="${escapeHtml(category.name)}" style="--category-color: ${safeColor(category.color)}">
             <div class="field">
               <label>Name</label>
-              <input name="name" value="${category.name}" required />
+              <input name="name" value="${escapeHtml(category.name)}" required />
               <span>${state.articles.filter((article) => article.category === category.name).length} Artikel</span>
             </div>
             <div class="field color-field">
               <label>Farbe</label>
-              <input name="color" type="color" value="${category.color}" title="Farbe" />
+              <input name="color" type="color" value="${safeColor(category.color)}" title="Farbe" />
             </div>
-            <button class="danger-button small-button" type="button" data-delete-category="${category.name}">Löschen</button>
+            <button class="danger-button small-button" type="button" data-delete-category="${escapeHtml(category.name)}">Löschen</button>
           </form>
         `).join("")}
       </div>
@@ -820,7 +871,7 @@ function dayReportHistoryTemplate() {
         ${state.dayReports.map((report) => `
           <article class="history-card">
             <div>
-              <strong>${report.eventName}</strong>
+              <strong>${escapeHtml(report.eventName)}</strong>
               <span>${new Date(report.createdAt).toLocaleString("de-DE")} - ${report.orderCount} Buchungen - ${money(report.total)}</span>
             </div>
             <div class="history-actions">
@@ -868,7 +919,7 @@ function reportTableTemplate(title, rows, showSum, totalCount, totalSum) {
   const rowsHtml = rows.length
     ? rows.map((item) => `
       <tr>
-        <td>${item.name}</td>
+        <td>${escapeHtml(item.name)}</td>
         <td>${item.quantity}</td>
         ${showSum ? `<td>${money(item.sum)}</td>` : ""}
       </tr>
@@ -877,7 +928,7 @@ function reportTableTemplate(title, rows, showSum, totalCount, totalSum) {
 
   return `
     <article class="report-card">
-      <h3>${title}</h3>
+      <h3>${escapeHtml(title)}</h3>
       <div class="table-wrap">
         <table class="report-table">
           <thead>
@@ -919,33 +970,33 @@ function settingsTemplate() {
         <div class="settings-form-title">Festdaten</div>
         <div class="field">
           <label>Festname</label>
-          <input name="eventName" value="${state.settings.eventName}" required />
+          <input name="eventName" value="${escapeHtml(state.settings.eventName)}" required />
         </div>
         <div class="field">
           <label>Organisation</label>
-          <input name="clubName" value="${state.settings.clubName}" required />
+          <input name="clubName" value="${escapeHtml(state.settings.clubName)}" required />
         </div>
         <div class="field">
           <label>Logo</label>
           <div class="logo-upload-row">
             <input name="logo" type="file" accept="image/*" />
             <div class="logo-preview">
-              ${state.settings.logoDataUrl ? `<img src="${state.settings.logoDataUrl}" alt="Logo Vorschau" />` : "<span>Kein Logo hinterlegt</span>"}
+              ${safeLogoSrc(state.settings.logoDataUrl) ? `<img src="${safeLogoSrc(state.settings.logoDataUrl)}" alt="Logo Vorschau" />` : "<span>Kein Logo hinterlegt</span>"}
             </div>
           </div>
         </div>
         <div class="settings-form-title">Kassenhinweis</div>
         <div class="field">
           <label>Rechner</label>
-          <input name="calculatorName" value="${state.settings.calculatorName}" />
+          <input name="calculatorName" value="${escapeHtml(state.settings.calculatorName)}" />
         </div>
         <div class="field">
           <label>Telefonnummer</label>
-          <input name="calculatorPhone" value="${state.settings.calculatorPhone}" />
+          <input name="calculatorPhone" value="${escapeHtml(state.settings.calculatorPhone)}" />
         </div>
         <div class="field">
           <label>Hinweis</label>
-          <textarea name="calculatorComment" maxlength="400" rows="5">${state.settings.calculatorComment || ""}</textarea>
+          <textarea name="calculatorComment" maxlength="400" rows="5">${escapeHtml(state.settings.calculatorComment || "")}</textarea>
         </div>
       </form>
     </section>
@@ -963,9 +1014,9 @@ function userAccessTemplate() {
       </div>
       <div class="user-list">
         ${state.users.map((user) => `
-          <form class="user-password-card" data-password-user="${user.username}">
+          <form class="user-password-card" data-password-user="${escapeHtml(user.username)}">
             <div>
-              <strong>${user.username}</strong>
+              <strong>${escapeHtml(user.username)}</strong>
               <span>${roleLabel(user.role)}</span>
             </div>
             <div class="field">
@@ -1044,11 +1095,11 @@ function printSettingsTemplate() {
         </div>
         <div class="field">
           <label>Drucker-Port</label>
-          <input name="printerPort" value="${state.settings.printerPort || "/dev/ttyUSB0"}" placeholder="/dev/ttyUSB0" />
+          <input name="printerPort" value="${escapeHtml(state.settings.printerPort || "/dev/ttyUSB0")}" placeholder="/dev/ttyUSB0" />
         </div>
         <div class="field">
           <label>Textdatei-Verzeichnis</label>
-          <input name="printOutputDir" value="${state.settings.printOutputDir || "data/prints"}" />
+          <input name="printOutputDir" value="${escapeHtml(state.settings.printOutputDir || "data/prints")}" />
         </div>
         <div class="field settings-test-print">
           <button class="action-button" type="button" data-test-print>Testbon schreiben</button>
@@ -1070,7 +1121,7 @@ function dataManagementTemplate() {
       <div class="data-save-row">
         <div class="field data-new-field">
           <label>Vorlagenname</label>
-          <input data-new-event-name value="${state.settings.eventName}" />
+          <input data-new-event-name value="${escapeHtml(state.settings.eventName)}" />
         </div>
         <button class="action-button" data-save-current-event>Aktuelles Fest speichern</button>
         <button class="action-button" data-load-default-event>Default laden</button>
@@ -1097,12 +1148,12 @@ function eventCatalogTemplate() {
       ${savedEvents.length ? savedEvents.map((event) => `
     <article class="history-card">
       <div>
-        <strong>${event.eventName}</strong>
+        <strong>${escapeHtml(event.eventName)}</strong>
         <span>${eventMetaTemplate(event)}</span>
       </div>
       <div class="history-actions">
-        <button class="action-button small-button" data-template-event="${event.file}">Fest laden</button>
-        <button class="danger-button small-button" data-delete-event="${event.file}">Löschen</button>
+        <button class="action-button small-button" data-template-event="${escapeHtml(event.file)}">Fest laden</button>
+        <button class="danger-button small-button" data-delete-event="${escapeHtml(event.file)}">Löschen</button>
       </div>
     </article>
   `).join("") : `<p class="hint">Noch keine gespeicherten Vorlagen.</p>`}
@@ -1115,7 +1166,7 @@ function eventMetaTemplate(event) {
   const date = event.updatedAt
     ? new Date(event.updatedAt)
     : new Date();
-  return `${event.clubName || "-"} - ${event.sourceEventName || event.eventName || event.file} - ${date.toLocaleString("de-DE", { dateStyle: "short", timeStyle: "short" })} - ${typeLabel}`;
+  return `${escapeHtml(event.clubName || "-")} - ${escapeHtml(event.sourceEventName || event.eventName || event.file)} - ${date.toLocaleString("de-DE", { dateStyle: "short", timeStyle: "short" })} - ${typeLabel}`;
 }
 
 function articleFormTemplate() {
@@ -1148,14 +1199,14 @@ function articleFormTemplate() {
 
 function articleEditTemplate(article, index) {
   return `
-    <form class="article-edit-card" data-edit-article="${article.id}">
+    <form class="article-edit-card" data-edit-article="${escapeHtml(article.id)}">
       <div class="row-actions">
-        <button class="qty-button" type="button" data-move-article="${article.id}" data-direction="-1" ${index === 0 ? "disabled" : ""}>↑</button>
-        <button class="qty-button" type="button" data-move-article="${article.id}" data-direction="1" ${index === state.articles.length - 1 ? "disabled" : ""}>↓</button>
+        <button class="qty-button" type="button" data-move-article="${escapeHtml(article.id)}" data-direction="-1" ${index === 0 ? "disabled" : ""}>↑</button>
+        <button class="qty-button" type="button" data-move-article="${escapeHtml(article.id)}" data-direction="1" ${index === state.articles.length - 1 ? "disabled" : ""}>↓</button>
       </div>
       <div class="field">
         <label>Name</label>
-        <input name="name" value="${article.name}" required />
+        <input name="name" value="${escapeHtml(article.name)}" required />
       </div>
       <div class="field">
         <label>Preis</label>
@@ -1180,9 +1231,28 @@ function articleEditTemplate(article, index) {
           <option value="false" ${!article.active ? "selected" : ""}>Deaktiv</option>
         </select>
       </div>
-      <button class="danger-button small-button" type="button" data-delete-article="${article.id}">Löschen</button>
+      <button class="danger-button small-button" type="button" data-delete-article="${escapeHtml(article.id)}">Löschen</button>
     </form>
   `;
+}
+
+async function attemptLogin(username, password, force = false) {
+  const response = await apiFetch("/api/login", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ username, password, force })
+  });
+  const payload = await response.json().catch(() => ({}));
+
+  if (!response.ok) {
+    if (response.status === 409 && !force) {
+      const takeOver = window.confirm(`${payload.error || "Bereits angemeldet."}\n\nTrotzdem übernehmen und die andere Sitzung abmelden?`);
+      if (takeOver) return attemptLogin(username, password, true);
+    }
+    return { ok: false, error: payload.error || "Login fehlgeschlagen." };
+  }
+
+  return { ok: true, user: payload.user, token: payload.token };
 }
 
 function bindLogin() {
@@ -1190,22 +1260,18 @@ function bindLogin() {
   document.querySelector("[data-login-form]").addEventListener("submit", async (event) => {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
-    const response = await fetch("/api/login", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        username: form.get("username"),
-        password: form.get("password")
-      })
-    });
+    const result = await attemptLogin(form.get("username"), form.get("password"));
 
-    if (!response.ok) {
-      document.querySelector("[data-login-error]").classList.remove("hidden");
+    if (!result.ok) {
+      const errorBox = document.querySelector("[data-login-error]");
+      errorBox.textContent = result.error;
+      errorBox.classList.remove("hidden");
       return;
     }
 
-    const payload = await response.json();
-    sessionUser = payload.user;
+    sessionUser = result.user;
+    sessionToken = result.token || null;
+    sessionInvalidatedHandled = false;
     rememberSessionUser();
     activeView = "cashier";
     state = await loadState();
@@ -1245,6 +1311,7 @@ function bindShell() {
   });
 
   document.querySelector("[data-logout]")?.addEventListener("click", () => {
+    apiFetch("/api/logout", { method: "POST" }).catch(() => {});
     clearSessionUser();
     cart = [];
     paidAmount = "";
@@ -1280,7 +1347,7 @@ function startPrinterStatus() {
 
 async function refreshPrinterStatus() {
   try {
-    const response = await fetch(`/api/print/status?t=${Date.now()}`, { cache: "no-store" });
+    const response = await apiFetch(`/api/print/status?t=${Date.now()}`, { cache: "no-store" });
     if (!response.ok) throw new Error("Status nicht verfügbar");
     const payload = await response.json();
     printerStatus = { ...printerStatus, ...(payload.status || {}) };
@@ -1300,7 +1367,7 @@ function updatePrinterStatusDisplay() {
   statusElement.classList.toggle("offline", !online);
   box.classList.toggle("online", online);
   box.classList.toggle("offline", !online);
-  statusElement.innerHTML = `<span class="printer-dot"></span>${label}`;
+  statusElement.innerHTML = `<span class="printer-dot"></span>${escapeHtml(label)}`;
 }
 
 function bindCashier() {
@@ -1567,7 +1634,7 @@ function setButtonState(button, label, disabled = true) {
 }
 
 async function refreshEventCatalog() {
-  const response = await fetch("/api/events");
+  const response = await apiFetch("/api/events");
   if (!response.ok) {
     showToast("Festliste konnte nicht geladen werden.");
     return;
@@ -1584,7 +1651,7 @@ async function checkOnlineVersion() {
   versionCheck = { status: "checking", label: "prüfe..." };
   renderAdmin();
   try {
-    const response = await fetch(`/api/version-check?t=${Date.now()}`, { cache: "no-store" });
+    const response = await apiFetch(`/api/version-check?t=${Date.now()}`, { cache: "no-store" });
     const payload = response.ok ? await response.json() : {};
     if (!payload.ok) {
       versionCheck = {
@@ -1620,7 +1687,7 @@ function bindEventCatalogActions() {
 async function saveCurrentEvent(button) {
   const finishButton = setButtonState(button, "Speichern...");
   const name = document.querySelector("[data-new-event-name]")?.value || state.settings.eventName;
-  const response = await fetch("/api/events/save", {
+  const response = await apiFetch("/api/events/save", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ name })
@@ -1641,7 +1708,7 @@ async function saveCurrentEvent(button) {
 
 async function loadDefaultEvent() {
   if (!window.confirm("Default als Vorlage laden?\n\nVerkäufe und Tagesabschlüsse werden geleert, Grundartikel und Einstellungen übernommen.")) return;
-  const response = await fetch("/api/events/load", {
+  const response = await apiFetch("/api/events/load", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ source: "defaults", mode: "template" })
@@ -1654,7 +1721,7 @@ async function loadManagedEvent(file, mode) {
     ? `Fest "${file}" als Vorlage verwenden?\n\nVerkäufe und Tagesabschlüsse werden geleert, Artikel und Einstellungen übernommen.`
     : `Fest "${file}" vollständig laden?\n\nDas aktuelle Fest wird ersetzt.`;
   if (!window.confirm(text)) return;
-  const response = await fetch("/api/events/load", {
+  const response = await apiFetch("/api/events/load", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ file, mode })
@@ -1664,7 +1731,7 @@ async function loadManagedEvent(file, mode) {
 
 async function deleteManagedEvent(file) {
   if (!window.confirm(`Festdatei "${file}" endgültig löschen?`)) return;
-  const response = await fetch("/api/events", {
+  const response = await apiFetch("/api/events", {
     method: "DELETE",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ file })
@@ -1703,7 +1770,7 @@ async function setUserPassword(event) {
     return;
   }
   const username = event.currentTarget.dataset.passwordUser;
-  const response = await fetch("/api/users/password", {
+  const response = await apiFetch("/api/users/password", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ username, password })
@@ -2079,7 +2146,7 @@ async function undoLastCheckout() {
 
 async function printReceipt(receipts, total, isFree, receiptTime = new Date()) {
   if (state.settings.printerMode === "textfile" || state.settings.printerMode === "serial") {
-    const response = await fetch("/api/print/receipts", {
+    const response = await apiFetch("/api/print/receipts", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ settings: state.settings, receipts })
@@ -2117,7 +2184,7 @@ async function testPrint(button) {
   };
   const finishButton = setButtonState(button, settings.printerMode === "serial" ? "Drucke..." : "Schreibe...");
 
-  const response = await fetch("/api/print/test", {
+  const response = await apiFetch("/api/print/test", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ settings })
@@ -2138,11 +2205,11 @@ async function testPrint(button) {
 function receiptTemplate(item, receiptTime, isFree) {
   return `
     <article class="receipt-ticket">
-      <h1>${state.settings.eventName}</h1>
-      <p class="receipt-club">${state.settings.clubName}</p>
+      <h1>${escapeHtml(state.settings.eventName)}</h1>
+      <p class="receipt-club">${escapeHtml(state.settings.clubName)}</p>
       <p class="receipt-meta">Bon #${formatReceiptNumber(item.receiptNumber)} · ${cashierDateTime(receiptTime)}</p>
       <div class="receipt-divider"></div>
-      <strong class="receipt-item">${item.articleName || item.name}</strong>
+      <strong class="receipt-item">${escapeHtml(item.articleName || item.name)}</strong>
       ${isFree ? `<span class="receipt-free">Kostenlos</span>` : `<span class="receipt-price">${money(item.price ?? item.unitPrice)}</span>`}
       <div class="receipt-divider"></div>
     </article>
@@ -2192,9 +2259,9 @@ function printReportFromOrders(report) {
 
   renderPrint(`
     <section class="daily-print">
-      <h1>${report.title}</h1>
-      <p>${report.eventName}</p>
-      <p>${report.clubName}</p>
+      <h1>${escapeHtml(report.title)}</h1>
+      <p>${escapeHtml(report.eventName)}</p>
+      <p>${escapeHtml(report.clubName)}</p>
       <p>${new Date(report.createdAt).toLocaleString("de-DE")}</p>
       ${sections.map((section) => printReportSection(section.title, section.rows, section.showSum, section.totalCount, section.totalSum)).join("")}
     </section>
@@ -2202,7 +2269,7 @@ function printReportFromOrders(report) {
 }
 
 async function printReportTextFile(report) {
-  const response = await fetch("/api/print/report", {
+  const response = await apiFetch("/api/print/report", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ settings: state.settings, report })
@@ -2219,7 +2286,7 @@ async function printReportTextFile(report) {
 
 async function shutdownSystem() {
   if (!window.confirm("Raspberry wirklich herunterfahren?")) return;
-  const response = await fetch("/api/system/shutdown", { method: "POST" });
+  const response = await apiFetch("/api/system/shutdown", { method: "POST" });
   if (!response.ok) {
     const payload = await response.json().catch(() => ({}));
     showToast(payload.error || "Herunterfahren fehlgeschlagen.");
@@ -2269,7 +2336,7 @@ function printReportSection(title, rows, showSum, totalCount, totalSum) {
   const bodyRows = rows.length
     ? rows.map((row) => `
       <tr>
-        <td>${row.name}</td>
+        <td>${escapeHtml(row.name)}</td>
         <td>${row.quantity}</td>
         ${showSum ? `<td>${money(row.sum)}</td>` : ""}
       </tr>
@@ -2277,7 +2344,7 @@ function printReportSection(title, rows, showSum, totalCount, totalSum) {
     : `<tr><td colspan="${showSum ? 3 : 2}">Keine Buchungen</td></tr>`;
 
   return `
-    <h2>${title}</h2>
+    <h2>${escapeHtml(title)}</h2>
     <table>
       <thead>
         <tr>

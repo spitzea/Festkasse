@@ -44,7 +44,9 @@ System-Druckdialog benötigt.
 ## Betrieb und Diagnose
 
 - Lokaler Node.js-Server ohne Cloud-Abhängigkeit
-- Gemeinsame Datenhaltung für mehrere Geräte im lokalen Netzwerk
+- Zentrale Datenhaltung, erreichbar von jedem Gerät im lokalen Netzwerk
+- Genau eine aktive Sitzung gleichzeitig, um widersprüchliche Buchungen zu
+  vermeiden; Übernahme durch ein anderes Gerät nur nach Rückfrage
 - Versions- und Systeminformationen zur Fehleranalyse
 - Raspberry-Pi-Kiosk mit automatischem Start und optionalem
   Herunterfahren-Button

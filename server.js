@@ -214,6 +214,74 @@ function verifyPassword(user, password) {
   return user.password && user.password === password;
 }
 
+const SESSION_TTL_MS = 12 * 60 * 60 * 1000;
+
+// Nur eine aktive Session gleichzeitig, strikt (auch der gleiche Benutzer wird abgewiesen,
+// solange die Session noch läuft) - verhindert gleichzeitige Schreibzugriffe auf den State
+// von mehreren Kassen. Rein im Arbeitsspeicher: ein Absturz/Neustart des Prozesses
+// (z. B. nach Pi-Reboot) löscht den Lock automatisch, ohne dass etwas aufgeräumt werden muss.
+let activeSession = null;
+let takenOverToken = null;
+
+function isSessionActive() {
+  if (!activeSession) return false;
+  if (activeSession.expiresAt < Date.now()) {
+    activeSession = null;
+    return false;
+  }
+  return true;
+}
+
+function createSession(user) {
+  if (isSessionActive()) {
+    takenOverToken = activeSession.token;
+  }
+  const token = crypto.randomBytes(32).toString("hex");
+  activeSession = { token, id: user.id, username: user.username, role: user.role, expiresAt: Date.now() + SESSION_TTL_MS };
+  return token;
+}
+
+function getSession(token) {
+  if (!token || !isSessionActive() || activeSession.token !== token) return null;
+  activeSession.expiresAt = Date.now() + SESSION_TTL_MS;
+  return activeSession;
+}
+
+function destroySession(token) {
+  if (activeSession && activeSession.token === token) {
+    activeSession = null;
+  }
+}
+
+function sessionTokenFromRequest(req) {
+  const header = req.headers.authorization || "";
+  return header.startsWith("Bearer ") ? header.slice(7).trim() : "";
+}
+
+function requireSession(req, res) {
+  const token = sessionTokenFromRequest(req);
+  const session = getSession(token);
+  if (!session) {
+    if (token && token === takenOverToken) {
+      sendJson(res, 401, { error: "Sitzung wurde auf einem anderen Gerät übernommen.", reason: "taken-over" });
+    } else {
+      sendJson(res, 401, { error: "Anmeldung erforderlich." });
+    }
+    return null;
+  }
+  return session;
+}
+
+function requireAdminSession(req, res) {
+  const session = requireSession(req, res);
+  if (!session) return null;
+  if (session.role !== "admin") {
+    sendJson(res, 403, { error: "Nur für Administratoren." });
+    return null;
+  }
+  return session;
+}
+
 function createTemplateState(source, eventName = source.settings?.eventName || "Neues Fest") {
   return {
     ...source,
@@ -800,6 +868,7 @@ async function handleApi(req, res, urlPath) {
   }
 
   if (req.method === "POST" && urlPath === "/api/state") {
+    if (!requireSession(req, res)) return;
     const body = await readBody(req);
     const current = await readJson(activePath);
     const nextState = mergeIncomingState(current, body.state || {});
@@ -817,12 +886,24 @@ async function handleApi(req, res, urlPath) {
       sendJson(res, 401, { error: "Login fehlgeschlagen." });
       return;
     }
+    if (isSessionActive() && !body.force) {
+      sendJson(res, 409, { error: `Bereits angemeldet: ${activeSession.username}`, activeUsername: activeSession.username });
+      return;
+    }
     const { passwordHash, passwordSalt, password, ...safeUser } = user;
-    sendJson(res, 200, { user: safeUser });
+    const token = createSession(safeUser);
+    sendJson(res, 200, { user: safeUser, token });
+    return;
+  }
+
+  if (req.method === "POST" && urlPath === "/api/logout") {
+    destroySession(sessionTokenFromRequest(req));
+    sendJson(res, 200, { ok: true });
     return;
   }
 
   if (req.method === "GET" && urlPath === "/api/events") {
+    if (!requireAdminSession(req, res)) return;
     const active = await readJson(activePath);
     const saved = await listManagedFiles(savedDir, "saved");
     sendJson(res, 200, {
@@ -845,6 +926,7 @@ async function handleApi(req, res, urlPath) {
   }
 
   if (req.method === "POST" && urlPath === "/api/events/save") {
+    if (!requireAdminSession(req, res)) return;
     const body = await readBody(req);
     const active = await readJson(activePath);
     const templateName = String(body.name || active.settings?.eventName || "Vorlage").trim();
@@ -865,6 +947,7 @@ async function handleApi(req, res, urlPath) {
   }
 
   if (req.method === "POST" && urlPath === "/api/events/load") {
+    if (!requireAdminSession(req, res)) return;
     const body = await readBody(req);
     const source = body.source === "defaults" ? await readJson(defaultsPath) : await readJson(resolveManagedFile(body.file));
     const nextState = body.mode === "template"
@@ -876,6 +959,7 @@ async function handleApi(req, res, urlPath) {
   }
 
   if (req.method === "POST" && urlPath === "/api/events/new") {
+    if (!requireAdminSession(req, res)) return;
     const body = await readBody(req);
     const source = body.file ? await readJson(resolveManagedFile(body.file)) : await readJson(defaultsPath);
     const nextState = createTemplateState(source, body.eventName || "Neues Fest");
@@ -885,6 +969,7 @@ async function handleApi(req, res, urlPath) {
   }
 
   if (req.method === "DELETE" && urlPath === "/api/events") {
+    if (!requireAdminSession(req, res)) return;
     const body = await readBody(req);
     const filePath = resolveManagedFile(body.file);
     await fsp.unlink(filePath);
@@ -893,6 +978,7 @@ async function handleApi(req, res, urlPath) {
   }
 
   if (req.method === "POST" && urlPath === "/api/users/password") {
+    if (!requireAdminSession(req, res)) return;
     const body = await readBody(req);
     const state = await readJson(activePath);
     const user = (state.users || []).find((candidate) => candidate.username === body.username || candidate.id === body.id);
@@ -908,12 +994,14 @@ async function handleApi(req, res, urlPath) {
   }
 
   if (req.method === "GET" && urlPath === "/api/print/status") {
+    if (!requireSession(req, res)) return;
     const state = await readJson(activePath);
     sendJson(res, 200, { status: await printerStatus(state.settings || {}) });
     return;
   }
 
   if (req.method === "POST" && urlPath === "/api/print/receipts") {
+    if (!requireSession(req, res)) return;
     const body = await readBody(req);
     const state = await readJson(activePath);
     const settings = { ...(state.settings || {}), ...(body.settings || {}) };
@@ -936,6 +1024,7 @@ async function handleApi(req, res, urlPath) {
   }
 
   if (req.method === "POST" && urlPath === "/api/print/report") {
+    if (!requireAdminSession(req, res)) return;
     const body = await readBody(req);
     const state = await readJson(activePath);
     const settings = { ...(state.settings || {}), ...(body.settings || {}) };
@@ -958,6 +1047,7 @@ async function handleApi(req, res, urlPath) {
   }
 
   if (req.method === "POST" && urlPath === "/api/print/test") {
+    if (!requireAdminSession(req, res)) return;
     const body = await readBody(req);
     const state = await readJson(activePath);
     const settings = { ...(state.settings || {}), ...(body.settings || {}) };
