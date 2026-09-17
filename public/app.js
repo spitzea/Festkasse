@@ -91,6 +91,9 @@ let systemInfo = {
 };
 let versionCheck = { status: "unchecked", label: "nicht geprüft" };
 let lastCheckout = null;
+// Laeuft gerade eine Buchung oder ein Storno? Sperrt Warenkorb und Knoepfe,
+// damit ein zweiter Klick waehrend des Speicherns nicht doppelt bucht.
+let checkoutInProgress = false;
 let undoCheckoutTimer = null;
 let systemInfoRefreshPending = false;
 let versionCheckStarted = false;
@@ -745,8 +748,8 @@ function cartTemplate() {
             <output data-change-output>${money(change)}</output>
           </div>
           <div class="checkout-actions">
-            <button class="primary-button" data-print-paid ${cart.length ? "" : "disabled"}>Bon drucken</button>
-            <button class="ghost-button" data-print-free ${cart.length ? "" : "disabled"}>Kostenlos buchen</button>
+            <button class="primary-button" data-print-paid ${cart.length && !checkoutInProgress ? "" : "disabled"}>Bon drucken</button>
+            <button class="ghost-button" data-print-free ${cart.length && !checkoutInProgress ? "" : "disabled"}>Kostenlos buchen</button>
           </div>
         </div>
       </div>
@@ -2172,6 +2175,7 @@ function deleteCategory(categoryName) {
 }
 
 function addToCart(articleId) {
+  if (checkoutInProgress) return;
   const article = state.articles.find((item) => item.id === articleId);
   const inCart = cart.find((item) => item.articleId === articleId);
   const alreadyReserved = inCart ? inCart.quantity : 0;
@@ -2197,6 +2201,7 @@ function addToCart(articleId) {
 }
 
 function decrementCart(articleId) {
+  if (checkoutInProgress) return;
   const item = cart.find((cartItem) => cartItem.articleId === articleId);
   if (!item) return;
 
@@ -2210,7 +2215,7 @@ function decrementCart(articleId) {
 }
 
 function cancelCart() {
-  if (!cart.length) return;
+  if (checkoutInProgress || !cart.length) return;
 
   state.cancellations.push({
     id: uid("can"),
@@ -2228,7 +2233,7 @@ function cancelCart() {
 }
 
 async function checkout(isFree) {
-  if (!cart.length) return;
+  if (checkoutInProgress || !cart.length) return;
   const receiptTime = new Date();
   let nextReceiptNumber = Math.max(1, Number(state.settings.nextReceiptNumber) || 1);
 
@@ -2268,43 +2273,90 @@ async function checkout(isFree) {
     }))
   );
 
-  if (!(await printReceipt(receiptItems, total, isFree, receiptTime))) {
-    return;
-  }
+  // Ab hier wird der Zustand veraendert: der Knopf bleibt gesperrt, bis die
+  // Buchung durch ist. Sonst bucht ein zweiter Klick waehrend des Wartens ein
+  // zweites Mal. checkoutInProgress sperrt zusaetzlich den Warenkorb, damit
+  // ein Neuzeichnen die Knoepfe nicht wieder freischaltet.
+  checkoutInProgress = true;
+  const finishPaidButton = setButtonState(document.querySelector("[data-print-paid]"), "Bucht...");
+  const finishFreeButton = setButtonState(document.querySelector("[data-print-free]"), "Bucht...");
 
-  // Der Bestand wird erst nach der finalen Prüfung reduziert, damit halbe Buchungen vermieden werden.
   const changedArticleIds = cart.map((item) => item.articleId);
-
-  cart.forEach((item) => {
-    const article = state.articles.find((candidate) => candidate.id === item.articleId);
-    article.stock -= item.quantity;
-  });
-
+  const previousReceiptNumber = state.settings.nextReceiptNumber;
   const orderId = uid("ord");
-  state.settings.nextReceiptNumber = nextReceiptNumber;
-  state.orders.push({
-    id: orderId,
-    createdAt: receiptTime.toISOString(),
-    cashierId: sessionUser.id,
-    status: "paid",
-    paidAmount: isFree ? 0 : Number(paidAmount || total),
-    changeAmount: isFree ? 0 : Math.max(0, Number(paidAmount || total) - total),
-    total,
-    receiptNumbers: receiptItems.map((receipt) => receipt.receiptNumber),
-    items
-  });
+  let saved = false;
 
-  if (!(await saveState())) return;
-  lastCheckout = { orderId, expiresAt: Date.now() + LAST_RECEIPT_UNDO_MS };
-  scheduleUndoCheckoutExpiry();
-  cart = [];
-  paidAmount = "";
-  showToast(isFree ? "Kostenlos gebucht." : "Bezahlt und gespeichert.");
-  renderCart();
-  changedArticleIds.forEach(updateArticleButtonState);
+  // Nimmt die lokalen Aenderungen zurueck, solange nichts gespeichert wurde.
+  // Ohne das bleibt der Bestand reduziert und die Bestellung im Zustand, waehrend
+  // der Server nichts davon weiss.
+  const rollback = () => {
+    state.orders = state.orders.filter((order) => order.id !== orderId);
+    state.settings.nextReceiptNumber = previousReceiptNumber;
+    cart.forEach((item) => {
+      const article = state.articles.find((candidate) => candidate.id === item.articleId);
+      if (article) article.stock += item.quantity;
+    });
+  };
+
+  try {
+    cart.forEach((item) => {
+      const article = state.articles.find((candidate) => candidate.id === item.articleId);
+      article.stock -= item.quantity;
+    });
+
+    state.settings.nextReceiptNumber = nextReceiptNumber;
+    state.orders.push({
+      id: orderId,
+      createdAt: receiptTime.toISOString(),
+      cashierId: sessionUser.id,
+      status: "paid",
+      paidAmount: isFree ? 0 : Number(paidAmount || total),
+      changeAmount: isFree ? 0 : Math.max(0, Number(paidAmount || total) - total),
+      total,
+      receiptNumbers: receiptItems.map((receipt) => receipt.receiptNumber),
+      items
+    });
+
+    // Erst speichern, dann drucken: einen fehlenden Bon kann man stornieren und
+    // neu buchen, eine verlorene Buchung laesst sich nicht rekonstruieren.
+    if (!(await saveState())) {
+      rollback();
+      return;
+    }
+    saved = true;
+
+    lastCheckout = { orderId, expiresAt: Date.now() + LAST_RECEIPT_UNDO_MS };
+    scheduleUndoCheckoutExpiry();
+    cart = [];
+    paidAmount = "";
+
+    if (await printReceipt(receiptItems, total, isFree, receiptTime)) {
+      showToast(isFree ? "Kostenlos gebucht." : "Bezahlt und gespeichert.");
+    } else {
+      // Typ ausdruecklich: an der Kasse zeigt showToast nur Warnungen und
+      // Fehler, und "gebucht" allein wuerde als Erfolg durchgehen.
+      showToast("Gebucht, aber der Bon wurde nicht gedruckt. Bei Bedarf stornieren und erneut buchen.", "warning");
+    }
+  } catch (error) {
+    if (!saved) {
+      rollback();
+      showToast("Buchung fehlgeschlagen, es wurde nichts gebucht. Bitte erneut versuchen.", "error");
+    } else {
+      // Typ ausdruecklich: an der Kasse zeigt showToast nur Warnungen und
+      // Fehler, und "gebucht" allein wuerde als Erfolg durchgehen.
+      showToast("Gebucht, aber der Bon wurde nicht gedruckt. Bei Bedarf stornieren und erneut buchen.", "warning");
+    }
+  } finally {
+    checkoutInProgress = false;
+    finishPaidButton();
+    finishFreeButton();
+    renderCart();
+    changedArticleIds.forEach(updateArticleButtonState);
+  }
 }
 
 async function undoLastCheckout() {
+  if (checkoutInProgress) return;
   if (!canUndoLastCheckout()) {
     lastCheckout = null;
     renderCart();
@@ -2320,31 +2372,64 @@ async function undoLastCheckout() {
 
   if (!window.confirm("Letzten Bon wirklich stornieren?")) return;
 
+  // Gleiche Absicherung wie beim Buchen: sperren, aendern, speichern, bei
+  // einem Fehler alles zuruecknehmen.
+  checkoutInProgress = true;
+  const finishUndoButton = setButtonState(document.querySelector("[data-undo-last-checkout]"), "Storniert...");
+
   const changedArticleIds = [];
-  order.items.forEach((item) => {
-    const article = state.articles.find((candidate) => candidate.id === item.articleId);
-    if (!article) return;
-    article.stock += item.quantity;
-    changedArticleIds.push(item.articleId);
-  });
+  const cancellationId = uid("can");
+  let saved = false;
+  const rollback = () => {
+    changedArticleIds.forEach((articleId) => {
+      const article = state.articles.find((candidate) => candidate.id === articleId);
+      const item = order.items.find((candidate) => candidate.articleId === articleId);
+      if (article && item) article.stock -= item.quantity;
+    });
+    state.cancellations = state.cancellations.filter((item) => item.id !== cancellationId);
+    if (!state.orders.some((item) => item.id === order.id)) state.orders.push(order);
+  };
 
-  state.orders = state.orders.filter((item) => item.id !== order.id);
-  state.cancellations.push({
-    id: uid("can"),
-    createdAt: new Date().toISOString(),
-    cashierId: sessionUser.id,
-    reason: "Storno letzter Bon",
-    orderId: order.id,
-    receiptNumbers: order.receiptNumbers || [],
-    items: cloneData(order.items)
-  });
+  try {
+    order.items.forEach((item) => {
+      const article = state.articles.find((candidate) => candidate.id === item.articleId);
+      if (!article) return;
+      article.stock += item.quantity;
+      changedArticleIds.push(item.articleId);
+    });
 
-  if (!(await saveState())) return;
-  lastCheckout = null;
-  scheduleUndoCheckoutExpiry();
-  showToast("Letzter Bon storniert.");
-  renderCart();
-  changedArticleIds.forEach(updateArticleButtonState);
+    state.orders = state.orders.filter((item) => item.id !== order.id);
+    state.cancellations.push({
+      id: cancellationId,
+      createdAt: new Date().toISOString(),
+      cashierId: sessionUser.id,
+      reason: "Storno letzter Bon",
+      orderId: order.id,
+      receiptNumbers: order.receiptNumbers || [],
+      items: cloneData(order.items)
+    });
+
+    if (!(await saveState())) {
+      rollback();
+      return;
+    }
+    saved = true;
+    lastCheckout = null;
+    scheduleUndoCheckoutExpiry();
+    showToast("Letzter Bon storniert.");
+  } catch (error) {
+    if (saved) {
+      showToast("Storno gespeichert, die Anzeige ist möglicherweise nicht aktuell.", "warning");
+    } else {
+      rollback();
+      showToast("Storno fehlgeschlagen, der Bon bleibt gebucht. Bitte erneut versuchen.", "error");
+    }
+  } finally {
+    checkoutInProgress = false;
+    finishUndoButton();
+    renderCart();
+    changedArticleIds.forEach(updateArticleButtonState);
+  }
 }
 
 async function printReceipt(receipts, total, isFree, receiptTime = new Date()) {
