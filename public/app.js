@@ -96,6 +96,8 @@ let versionCheckStarted = false;
 let printerStatus = { online: false, label: "Drucker Offline", mode: "browser" };
 let systemNetwork = null;
 let systemNetworkPending = false;
+let systemNetworkFetchedAt = 0;
+const SYSTEM_NETWORK_TTL_MS = 15000;
 let printerStatusTimer = null;
 let themeMode = normalizeThemeMode(window.localStorage.getItem(THEME_STORAGE_KEY));
 
@@ -180,6 +182,7 @@ async function refreshSystemNetwork() {
     const response = await apiFetch(`/api/system/network?t=${Date.now()}`, { cache: "no-store" });
     if (!response.ok) return;
     systemNetwork = await response.json();
+    systemNetworkFetchedAt = Date.now();
   } catch (error) {
     // Netzwerk-Info ist rein informativ, kein harter Fehler noetig.
   }
@@ -773,7 +776,15 @@ function renderAdmin() {
       }
     });
   }
-  if (activeAdminSection === "settings" && !systemNetwork && !systemNetworkPending) {
+  if (
+    activeAdminSection === "settings" &&
+    !systemNetworkPending &&
+    (!systemNetwork || Date.now() - systemNetworkFetchedAt > SYSTEM_NETWORK_TTL_MS)
+  ) {
+    // Die IP kann sich waehrend der Laufzeit aendern (WLAN-Wechsel, neue
+    // DHCP-Vergabe) - anders als appVersion/gitCommit im "info"-Bereich darf
+    // dieser Wert daher nicht nur einmalig geholt werden, sonst zeigt der
+    // QR-Code nach einem Netzwerkwechsel dauerhaft die alte Adresse.
     systemNetworkPending = true;
     refreshSystemNetwork().finally(() => {
       systemNetworkPending = false;
