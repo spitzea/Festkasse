@@ -9,6 +9,8 @@
 - Warenkorb mit Erhöhen, Reduzieren und Löschen einzelner Positionen
 - Berechnung von erhaltenem Betrag und Rückgeld
 - Normale und kostenlose Buchungen mit Bestandsreduzierung
+- Deutlich sichtbare Warnung mit Restmenge, sobald ein Artikel den Warnbestand
+  erreicht
 - Anzeige von Kassenleitung, Telefonnummer und frei definierbarem Hinweis
 - Helles und dunkles Design
 

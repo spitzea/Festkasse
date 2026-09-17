@@ -680,6 +680,14 @@ function categoryGroupTemplate(category, articles) {
   `;
 }
 
+// Der Bestand steht bei Knappheit als auffaelliger Chip in der Kachel: an der
+// Kasse wird nebenbei gearbeitet, ein duenner Rahmen allein wird uebersehen.
+function articleStockText(article) {
+  if (article.stock <= 0) return "Ausverkauft";
+  if (article.stock <= article.warningStock) return `⚠ Nur noch ${article.stock}`;
+  return `${article.stock} Stk.`;
+}
+
 function articleButtonTemplate(article) {
   const out = article.stock <= 0;
   const low = !out && article.stock <= article.warningStock;
@@ -688,9 +696,8 @@ function articleButtonTemplate(article) {
       <span class="article-name">${escapeHtml(article.name)}</span>
       <span class="article-meta">
         <span>${money(article.price)}</span>
-        <span data-article-stock>${out ? "Ausverkauft" : `${article.stock} Stk.`}</span>
+        <span class="${low ? "article-stock-low" : ""}" data-article-stock>${articleStockText(article)}</span>
       </span>
-      ${low ? `<span class="article-meta"><span>Knapp!</span><span>Warnung bei ${article.warningStock}</span></span>` : ""}
     </button>
   `;
 }
@@ -1597,11 +1604,18 @@ function updateArticleButtonState(articleId) {
 
   const reserved = cart.find((item) => item.articleId === articleId)?.quantity || 0;
   const out = article.stock <= 0 || reserved >= article.stock;
+  const low = !out && article.stock <= article.warningStock;
   const stockElement = button.querySelector("[data-article-stock]");
   button.disabled = out;
   button.classList.toggle("out", out);
+  // Die Warnung muss hier mitlaufen: nach einer Buchung zeichnet checkout() die
+  // Kacheln nicht neu, sondern ruft nur diese Funktion fuer die betroffenen
+  // Artikel auf. Ohne das erscheint "Nur noch ..." erst beim naechsten
+  // vollstaendigen Neuzeichnen, also unter Umstaenden Stunden spaeter.
+  button.classList.toggle("low", low);
   if (stockElement) {
-    stockElement.textContent = article.stock <= 0 ? "Ausverkauft" : `${article.stock} Stk.`;
+    stockElement.classList.toggle("article-stock-low", low);
+    stockElement.textContent = articleStockText(article);
   }
 }
 

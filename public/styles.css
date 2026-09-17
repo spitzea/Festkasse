@@ -617,6 +617,10 @@ textarea:focus-visible {
 
 .article-button.low {
   outline: 2px solid color-mix(in srgb, var(--amber) 72%, #fff);
+  border-left-color: var(--amber);
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--amber) 24%, var(--panel-strong)), var(--panel-strong)),
+    var(--panel-strong);
 }
 
 .article-button.out {
@@ -646,6 +650,17 @@ textarea:focus-visible {
   font-size: 0.86rem;
   font-weight: 800;
   text-align: left;
+}
+
+/* Knapper Bestand als gefuellter Chip statt als blasse Zahl - die Kasse wird
+   nebenbei bedient, und nur der Rahmen um die Kachel wird uebersehen. */
+.article-stock-low {
+  padding: 0.08rem 0.45rem;
+  border-radius: 999px;
+  background: var(--amber);
+  color: #1b1b1f;
+  font-weight: 900;
+  white-space: nowrap;
 }
 
 .cart {
