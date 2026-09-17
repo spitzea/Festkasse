@@ -166,6 +166,16 @@ async function loadState() {
   return normalizeState(payload.state);
 }
 
+// Der vollstaendige Zustand haengt hinter der Anmeldung. Vor dem Login gibt es
+// nur diesen schmalen Endpunkt mit dem, was der Login-Bildschirm zeigt.
+async function loadBootstrap() {
+  const response = await fetch("/api/bootstrap");
+  if (!response.ok) throw new Error("Serverdaten konnten nicht geladen werden.");
+  const payload = await response.json();
+  state.settings = { ...state.settings, ...(payload.settings || {}) };
+  systemInfo = { ...systemInfo, ...(payload.system || {}) };
+}
+
 async function refreshSystemInfo() {
   try {
     const response = await apiFetch(`/api/system?t=${Date.now()}`, { cache: "no-store" });
@@ -355,35 +365,54 @@ function canManage() {
   return sessionUser && sessionUser.role === "admin";
 }
 
-function restoreSessionUser() {
+// Frueher wurde der gespeicherte Benutzer nur gegen die anonym geladene
+// Benutzerliste geprueft, das Token aber nie. Die Oberflaeche rendert dann als
+// angemeldet, bevor der Server das Token gesehen hat. Jetzt entscheidet
+// ausschliesslich der Server: das Token geht mit, und erst wenn /api/state
+// antwortet, gilt die Sitzung als gueltig.
+async function restoreSessionUser() {
   const rawSession = window.sessionStorage.getItem(SESSION_STORAGE_KEY);
   if (!rawSession) return;
 
+  let storedUser = null;
   try {
-    const storedUser = JSON.parse(rawSession);
-    const matchingUser = state.users.find((user) =>
-      user.active &&
-      user.id === storedUser.id &&
-      user.username === storedUser.username &&
-      user.role === storedUser.role
-    );
-    sessionUser = matchingUser || null;
-    sessionToken = sessionUser ? storedUser.token || null : null;
-    if (sessionUser) {
-      // Ansicht ueberlebt einen Reload (z.B. wenn der Browser einen im
-      // Hintergrund liegenden Tab automatisch neu laedt) - sonst bleibt man
-      // zwar angemeldet, landet aber wieder auf der Kasse.
-      if (storedUser.activeView) activeView = storedUser.activeView;
-      if (storedUser.activeAdminSection) activeAdminSection = storedUser.activeAdminSection;
-    }
+    storedUser = JSON.parse(rawSession);
   } catch (error) {
-    sessionUser = null;
-    sessionToken = null;
+    storedUser = null;
   }
 
-  if (!sessionUser) {
-    window.sessionStorage.removeItem(SESSION_STORAGE_KEY);
+  if (!storedUser?.token) {
+    clearSessionUser();
+    return;
   }
+
+  sessionToken = storedUser.token;
+  let loadedState = null;
+  try {
+    loadedState = await loadState();
+  } catch (error) {
+    clearSessionUser();
+    return;
+  }
+
+  state = loadedState;
+  sessionUser = state.users.find((user) =>
+    user.active &&
+    user.id === storedUser.id &&
+    user.username === storedUser.username &&
+    user.role === storedUser.role
+  ) || null;
+
+  if (!sessionUser) {
+    clearSessionUser();
+    return;
+  }
+
+  // Ansicht ueberlebt einen Reload (z.B. wenn der Browser einen im
+  // Hintergrund liegenden Tab automatisch neu laedt) - sonst bleibt man
+  // zwar angemeldet, landet aber wieder auf der Kasse.
+  if (storedUser.activeView) activeView = storedUser.activeView;
+  if (storedUser.activeAdminSection) activeAdminSection = storedUser.activeAdminSection;
 }
 
 function rememberSessionUser() {
@@ -543,6 +572,8 @@ function toDateTimeLocalValue(isoString) {
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
 }
 
+// Die Box soll pro Zeile verschwinden, sobald genau dieser Zugang ein eigenes
+// Passwort bekommen hat - nicht erst, wenn alle drei geaendert sind.
 function defaultAccessTemplate() {
   const active = systemInfo.defaultPasswordUsernames || [];
   const entries = [
@@ -2594,10 +2625,12 @@ async function softRefreshApp() {
 
 async function init() {
   try {
-    state = await loadState();
-    restoreSessionUser();
+    await loadBootstrap();
   } catch (error) {
     bootError = "Die Festdaten konnten nicht vom Server geladen werden. Bitte die App über npm start / localhost öffnen.";
+  }
+  if (!bootError) {
+    await restoreSessionUser();
   }
   if (sessionUser?.role === "report") {
     window.location.href = "/report.html";

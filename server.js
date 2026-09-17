@@ -1046,7 +1046,41 @@ function setSystemTimeLinux(date) {
 }
 
 async function handleApi(req, res, urlPath) {
+  // Das Einzige, was der Login-Bildschirm vor der Anmeldung braucht: Namen
+  // fuer die Kopfzeile, die Kontaktangaben und die Standardzugaenge. Bewusst
+  // ohne Benutzerliste und ohne Bestellungen.
+  //
+  // defaultPasswordUsernames steht hier bewusst vor der Anmeldung: die Box
+  // soll pro Zeile verschwinden, sobald das jeweilige Passwort geaendert
+  // wurde. Das verraet einem nicht angemeldeten Aufrufer, welches der drei
+  // Konten noch das in der Doku veroeffentlichte Passwort hat - in Kauf
+  // genommen, weil die Kasse offline oder in einem privaten Netz laeuft und
+  // die Passwoerter ohnehin dokumentiert sind. Mehr als diese drei kann der
+  // Endpunkt nicht preisgeben: hasDefaultPassword erkennt Konten ueber Salt
+  // und Hash der Auslieferung, selbst angelegte Benutzer sind nie dabei.
+  if (req.method === "GET" && urlPath === "/api/bootstrap") {
+    const state = await readJson(activePath);
+    const settings = state.settings || {};
+    sendJson(res, 200, {
+      settings: {
+        eventName: settings.eventName || "",
+        clubName: settings.clubName || "",
+        logoDataUrl: settings.logoDataUrl || "",
+        calculatorName: settings.calculatorName || "",
+        calculatorPhone: settings.calculatorPhone || "",
+        calculatorComment: settings.calculatorComment || ""
+      },
+      system: {
+        appVersion: readPackageVersion(),
+        defaultPasswordsActive: hasAnyDefaultPassword(state),
+        defaultPasswordUsernames: defaultPasswordUsernames(state)
+      }
+    });
+    return;
+  }
+
   if (req.method === "GET" && urlPath === "/api/system") {
+    if (!requireSession(req, res)) return;
     const state = await readJson(activePath);
     sendJson(res, 200, { system: systemInfo(state) });
     return;
@@ -1070,6 +1104,7 @@ async function handleApi(req, res, urlPath) {
   }
 
   if (req.method === "GET" && urlPath === "/api/state") {
+    if (!requireSession(req, res)) return;
     const state = await readJson(activePath);
     sendJson(res, 200, { state: sanitizeState(state), system: systemInfo(state) });
     return;
