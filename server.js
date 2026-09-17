@@ -1161,13 +1161,20 @@ async function handleApi(req, res, urlPath) {
   if (req.method === "POST" && urlPath === "/api/users/password") {
     if (!requireAdminSession(req, res)) return;
     const body = await readBody(req);
+    const password = String(body.password || "");
+    // Clientseitig gibt es bereits minlength=4, der Server darf sich aber
+    // nicht darauf verlassen (Request laesst sich ohne Browser abschicken).
+    if (password.length < 4) {
+      sendJson(res, 400, { error: "Passwort muss mindestens 4 Zeichen haben." });
+      return;
+    }
     const state = await readJson(activePath);
     const user = (state.users || []).find((candidate) => candidate.username === body.username || candidate.id === body.id);
     if (!user) {
       sendJson(res, 404, { error: "Benutzer nicht gefunden." });
       return;
     }
-    Object.assign(user, createPasswordRecord(body.password || ""));
+    Object.assign(user, createPasswordRecord(password));
     delete user.password;
     await writeJson(activePath, state);
     sendJson(res, 200, { user: sanitizeState({ users: [user] }).users[0], system: systemInfo(state) });
