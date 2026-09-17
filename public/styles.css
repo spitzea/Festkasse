@@ -986,6 +986,16 @@ textarea:focus-visible {
   max-width: 64rem;
 }
 
+/* QR-Code und Systemzeit stehen nebeneinander, damit die Einstellungen auf
+   dem Kioskbildschirm ohne Scrollen sichtbar bleiben. Fehlt die Systemzeit,
+   nimmt der QR-Code die ganze Breite ein. */
+.settings-side-panels {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(22rem, 1fr));
+  gap: 0.8rem;
+  align-items: start;
+}
+
 .settings-form-title {
   grid-column: 1 / -1;
   margin-top: 0.25rem;

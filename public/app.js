@@ -1076,8 +1076,10 @@ function settingsTemplate() {
         </div>
       </form>
     </section>
-    ${networkQrTemplate()}
-    ${canSetSystemTime() ? systemTimeTemplate() : ""}
+    <div class="settings-side-panels">
+      ${networkQrTemplate()}
+      ${canSetSystemTime() ? systemTimeTemplate() : ""}
+    </div>
   `;
 }
 
