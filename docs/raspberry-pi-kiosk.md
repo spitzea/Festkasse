@@ -250,6 +250,10 @@ Herunterfahren in der Festkasse.
 
 ## Herunterfahren über die Anwendung
 
+Die Schaltfläche steht nur einer angemeldeten Administrator-Sitzung zur
+Verfügung; der Server weist Aufrufe ohne Administratorrechte ab. Vor der
+Anmeldung und für die Kassenrolle wird sie nicht angezeigt.
+
 Damit die Schaltfläche **Raspberry herunterfahren** ohne Passwortabfrage
 funktioniert:
 

@@ -1085,13 +1085,6 @@ textarea:focus-visible {
   width: fit-content;
 }
 
-.login-shutdown-button {
-  display: block;
-  width: fit-content;
-  margin: 0.75rem auto 0;
-  color: var(--muted);
-}
-
 .info-table {
   width: 100%;
   border-collapse: collapse;

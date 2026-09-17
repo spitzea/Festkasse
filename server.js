@@ -995,6 +995,7 @@ async function handleApi(req, res, urlPath) {
   }
 
   if (req.method === "GET" && urlPath === "/api/version-check") {
+    if (!requireSession(req, res)) return;
     try {
       sendJson(res, 200, await checkLatestVersion());
     } catch (error) {
@@ -1266,6 +1267,7 @@ async function handleApi(req, res, urlPath) {
   }
 
   if (req.method === "POST" && urlPath === "/api/system/shutdown") {
+    if (!requireAdminSession(req, res)) return;
     if (process.platform !== "linux") {
       sendJson(res, 400, { error: "Herunterfahren ist nur auf Linux aktiviert." });
       return;

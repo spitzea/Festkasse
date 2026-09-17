@@ -53,7 +53,7 @@ System-Druckdialog benötigt.
   vermeiden; Übernahme durch ein anderes Gerät nur nach Rückfrage
 - Versions- und Systeminformationen zur Fehleranalyse
 - Raspberry-Pi-Kiosk mit automatischem Start und optionalem
-  Herunterfahren-Button
+  Herunterfahren-Button (nur für Administratoren)
 - Systemzeit direkt im Adminbereich korrigierbar (nur Linux, z. B. bei
   Betrieb ohne Internet und damit ohne NTP)
 

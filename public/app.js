@@ -486,7 +486,6 @@ function loginTemplate() {
           </div>
           <div class="error ${notice ? "" : "hidden"}" data-login-error>${escapeHtml(notice || "Login fehlgeschlagen.")}</div>
         </form>
-        ${canShutdownSystem() ? `<button class="ghost-button small-button login-shutdown-button" type="button" data-system-shutdown>Herunterfahren</button>` : ""}
       </section>
     </main>
   `;
@@ -527,8 +526,10 @@ function shellTemplate() {
   `;
 }
 
+// Herunterfahren ist serverseitig adminpflichtig - der Knopf darf deshalb
+// weder vor der Anmeldung noch fuer die Kassenrolle erscheinen.
 function canShutdownSystem() {
-  return Boolean(systemInfo.canShutdown);
+  return Boolean(systemInfo.canShutdown) && canManage();
 }
 
 function canSetSystemTime() {
@@ -1353,7 +1354,6 @@ async function attemptLogin(username, password, force = false) {
 }
 
 function bindLogin() {
-  document.querySelector("[data-system-shutdown]")?.addEventListener("click", shutdownSystem);
   document.querySelector("[data-login-form]").addEventListener("submit", async (event) => {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
