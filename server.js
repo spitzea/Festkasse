@@ -668,23 +668,57 @@ function formatReportText(report, settings) {
   ];
 
   for (const section of sections) {
+    const showSum = Boolean(section.showSum);
+    const showStock = Boolean(section.showStock);
+    // Jede Zahl bekommt eine eigene, feste Spalte. Vorher standen Anzahl und
+    // Betrag als ein Block rechtsbuendig, dadurch sprang die Anzahl je nach
+    // Laenge des Betrags hin und her.
+    const columns = [
+      ...(showStock ? [{ header: "Bestand", width: 9 }] : []),
+      { header: "Anzahl", width: showSum ? 8 : 9 },
+      ...(showSum ? [{ header: "Summe", width: 12 }] : [])
+    ];
+    const nameWidth = width - columns.reduce((sum, column) => sum + column.width, 0);
+    const renderRow = (name, values) => {
+      const valueText = values.map((value, index) => padText(value, columns[index].width, "right")).join("");
+      // Lange Artikelnamen laufen in die naechste Zeile, damit die Spalten
+      // stehen bleiben.
+      const nameLines = wrapText(name, nameWidth);
+      return [
+        `${padText(nameLines[0], nameWidth)}${valueText}`.trimEnd(),
+        ...nameLines.slice(1).map((line) => padText(line, nameWidth).trimEnd())
+      ];
+    };
+
     lines.push("", String(section.title || "Abschnitt"), "-".repeat(width));
+    lines.push(`${padText("Artikel", nameWidth)}${columns.map((column) => padText(column.header, column.width, "right")).join("")}`);
+    lines.push("-".repeat(width));
+
     const rows = Array.isArray(section.rows) ? section.rows : [];
     if (!rows.length) {
       lines.push("Keine Buchungen");
     } else {
       for (const row of rows) {
-        const quantity = Number(row.quantity) || 0;
-        const name = String(row.name || "Artikel");
-        const amount = section.showSum ? moneyText(row.sum, settings.currency) : "";
-        const right = section.showSum ? `${quantity} ${amount}` : String(quantity);
-        lines.push(`${padText(name, 26)}${padText(right, 16, "right")}`);
+        lines.push(...renderRow(String(row.name || "Artikel"), [
+          ...(showStock ? [Number.isFinite(row.stock) ? String(row.stock) : "-"] : []),
+          String(Number(row.quantity) || 0),
+          ...(showSum ? [moneyText(row.sum, settings.currency)] : [])
+        ]));
       }
     }
+
     lines.push("-".repeat(width));
-    lines.push(`${padText("Total Artikel", 26)}${padText(section.totalCount || 0, 16, "right")}`);
-    if (section.showSum) {
-      lines.push(`${padText("Total Summe", 26)}${padText(moneyText(section.totalSum, settings.currency), 16, "right")}`);
+    lines.push(...renderRow("Total Artikel", [
+      ...(showStock ? [""] : []),
+      String(Number(section.totalCount) || 0),
+      ...(showSum ? [""] : [])
+    ]));
+    if (showSum) {
+      lines.push(...renderRow("Total Summe", [
+        ...(showStock ? [""] : []),
+        "",
+        moneyText(section.totalSum, settings.currency)
+      ]));
     }
   }
 

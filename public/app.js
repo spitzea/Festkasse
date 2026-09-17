@@ -2517,7 +2517,8 @@ function printDailyReport() {
     createdAt: new Date().toISOString(),
     orders: todayOrders(),
     eventName: state.settings.eventName,
-    clubName: state.settings.clubName
+    clubName: state.settings.clubName,
+    stockByArticleId: Object.fromEntries(state.articles.map((article) => [article.id, article.stock]))
   });
 }
 
@@ -2529,16 +2530,24 @@ function printArchivedReport(reportId) {
     createdAt: report.createdAt,
     orders: report.orders,
     eventName: report.eventName,
-    clubName: report.clubName
+    clubName: report.clubName,
+    stockByArticleId: report.stockByArticleId
   });
 }
 
 function printReportFromOrders(report) {
   const data = buildReportData(report.orders);
-  // Gleiche Reihenfolge wie auf dem Bildschirm: erst die Summe, dann die
-  // Aufteilung in bezahlt und kostenlos.
+  // Gleiche Reihenfolge und gleiche Spalten wie auf dem Bildschirm: erst die
+  // Summe mit dem Bestand, dann die Aufteilung in bezahlt und kostenlos.
   const sections = [
-    { title: "1. Summe", rows: data.consumptionRows, showSum: false, totalCount: data.consumptionCount, totalSum: 0 },
+    {
+      title: "1. Summe",
+      rows: attachStock(data.consumptionRows, report.stockByArticleId),
+      showSum: false,
+      showStock: true,
+      totalCount: data.consumptionCount,
+      totalSum: 0
+    },
     { title: "2. Normal", rows: data.normalRows, showSum: true, totalCount: data.normalCount, totalSum: data.normalSum },
     { title: "3. Kostenlos", rows: data.freeRows, showSum: false, totalCount: data.freeCount, totalSum: 0 }
   ];
@@ -2560,7 +2569,7 @@ function printReportFromOrders(report) {
       <p>${escapeHtml(report.eventName)}</p>
       <p>${escapeHtml(report.clubName)}</p>
       <p>${new Date(report.createdAt).toLocaleString("de-DE")}</p>
-      ${sections.map((section) => printReportSection(section.title, section.rows, section.showSum, section.totalCount, section.totalSum)).join("")}
+      ${sections.map((section) => printReportSection(section)).join("")}
     </section>
   `);
 }
@@ -2668,16 +2677,19 @@ function deleteArchivedReport(reportId) {
   renderAdmin();
 }
 
-function printReportSection(title, rows, showSum, totalCount, totalSum) {
+function printReportSection(section) {
+  const { title, rows, showSum, showStock, totalCount, totalSum } = section;
+  const columns = 2 + (showStock ? 1 : 0) + (showSum ? 1 : 0);
   const bodyRows = rows.length
     ? rows.map((row) => `
       <tr>
         <td>${escapeHtml(row.name)}</td>
+        ${showStock ? `<td>${Number.isFinite(row.stock) ? row.stock : "-"}</td>` : ""}
         <td>${row.quantity}</td>
         ${showSum ? `<td>${money(row.sum)}</td>` : ""}
       </tr>
     `).join("")
-    : `<tr><td colspan="${showSum ? 3 : 2}">Keine Buchungen</td></tr>`;
+    : `<tr><td colspan="${columns}">Keine Buchungen</td></tr>`;
 
   return `
     <h2>${escapeHtml(title)}</h2>
@@ -2685,6 +2697,7 @@ function printReportSection(title, rows, showSum, totalCount, totalSum) {
       <thead>
         <tr>
           <th>Artikel</th>
+          ${showStock ? "<th>Bestand</th>" : ""}
           <th>Anzahl</th>
           ${showSum ? "<th>Summe</th>" : ""}
         </tr>
@@ -2693,6 +2706,7 @@ function printReportSection(title, rows, showSum, totalCount, totalSum) {
       <tfoot>
         <tr>
           <td>Total Artikel</td>
+          ${showStock ? "<td></td>" : ""}
           <td>${totalCount}</td>
           ${showSum ? "<td></td>" : ""}
         </tr>
