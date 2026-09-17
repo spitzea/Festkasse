@@ -624,6 +624,16 @@ function createTemplateState(source, eventName = source.settings?.eventName || "
   };
 }
 
+// Benutzer gehoeren zur Installation, nicht zum Fest. Eine gespeicherte
+// Festdatei traegt die Konten samt Passwort-Hashes mit sich; ohne diesen
+// Schritt wuerde das Laden einer Vorlage vom letzten Jahr die Passwoerter
+// stillschweigend auf den damaligen Stand zuruecksetzen - im Zweifel auf die
+// Standardpasswoerter.
+function withCurrentUsers(nextState, currentState) {
+  const users = currentState?.users?.length ? currentState.users : nextState.users || [];
+  return { ...nextState, users };
+}
+
 function safeEventFileName(name) {
   const slug = String(name || "fest")
     .normalize("NFD")
@@ -1515,9 +1525,10 @@ async function handleApi(req, res, urlPath) {
     const source = await withoutEmbeddedLogo(
       body.source === "defaults" ? await readJson(defaultsPath) : await readJson(resolveManagedFile(body.file))
     );
-    const nextState = body.mode === "template"
+    const loaded = body.mode === "template"
       ? createTemplateState(source)
       : { ...source, settings: { ...(source.settings || {}), activeEventFile: "active-event.json" } };
+    const nextState = withCurrentUsers(loaded, await readJson(activePath));
     await writeJson(activePath, nextState);
     sendJson(res, 200, { state: sanitizeState(nextState), system: systemInfo(nextState) });
     return;
@@ -1529,7 +1540,10 @@ async function handleApi(req, res, urlPath) {
     const source = await withoutEmbeddedLogo(
       body.file ? await readJson(resolveManagedFile(body.file)) : await readJson(defaultsPath)
     );
-    const nextState = createTemplateState(source, body.eventName || "Neues Fest");
+    const nextState = withCurrentUsers(
+      createTemplateState(source, body.eventName || "Neues Fest"),
+      await readJson(activePath)
+    );
     await writeJson(activePath, nextState);
     sendJson(res, 200, { state: sanitizeState(nextState), system: systemInfo(nextState) });
     return;
