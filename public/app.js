@@ -1162,9 +1162,14 @@ function userAccessTemplate() {
 
 function infoTemplate() {
   const display = browserDisplayInfo();
+  // Die Git-Version ist nur dann eine echte Zusatzinformation, wenn die Kasse
+  // aus einem Klon laeuft und zwischen zwei Releases steht. Wurde sie als ZIP
+  // kopiert, gibt es kein Repository und die Zeile meldete bisher dauerhaft
+  // "nicht verfügbar" - eine Zeile Rauschen neben der Programmversion.
+  const gitCommit = displayValue(systemInfo.gitCommit, "");
   const rows = [
     ["Programmversion", displayValue(systemInfo.appVersion, "nicht verfügbar")],
-    ["Git-Version", displayValue(systemInfo.gitCommit, "nicht verfügbar")],
+    ...(gitCommit ? [["Git-Version", gitCommit]] : []),
     ["System", displayValue(systemInfo.platform, navigator.platform || "nicht verfügbar")],
     ["Node.js", displayValue(systemInfo.nodeVersion, "nicht verfügbar")],
     ["Angemeldet", sessionUser?.username || "-"],
