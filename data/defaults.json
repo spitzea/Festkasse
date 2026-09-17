@@ -183,7 +183,6 @@
     "printerPort": "/dev/ttyUSB0",
     "printOutputDir": "data/prints",
     "receiptFooter": "Vielen Dank!",
-    "logoDataUrl": "",
     "calculatorName": "Kassenleitung",
     "calculatorPhone": "",
     "calculatorComment": "",

@@ -9,8 +9,13 @@ function escapeHtml(value) {
   ));
 }
 
-function safeLogoSrc(value) {
-  return /^data:image\//i.test(String(value || "")) ? escapeHtml(value) : "";
+// Das Logo liegt seit 1.6.0 in einer eigenen Datei und kommt ueber /api/logo.
+// Die Schreibzeit haengt als Version daran, damit ein neu hochgeladenes Logo
+// den Browser-Cache sicher verdraengt. Erwartet wird ein Objekt mit hasLogo
+// und logoVersion - also die Systeminfo oder die Antwort des Berichts.
+function logoSrc(info) {
+  if (!info?.hasLogo) return "";
+  return `/api/logo?v=${encodeURIComponent(info.logoVersion || 0)}`;
 }
 
 function moneyText(value, currency = "EUR") {
@@ -187,7 +192,7 @@ function intervalChartTemplate(buckets, currency = "EUR") {
 if (typeof module !== "undefined" && module.exports) {
   module.exports = {
     escapeHtml,
-    safeLogoSrc,
+    logoSrc,
     moneyText,
     filterPaidOrdersForDate,
     totalsByMode,

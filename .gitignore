@@ -12,6 +12,7 @@ backups/
 tmp/
 temp/
 data/active-event.json
+data/logo.json
 data/saved/*.json
 data/prints/*.txt
 *.log

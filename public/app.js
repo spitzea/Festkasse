@@ -26,7 +26,6 @@ const seedData = {
     printerPort: "/dev/ttyUSB0",
     printOutputDir: "data/prints",
     receiptFooter: "Vielen Dank!",
-    logoDataUrl: "",
     calculatorName: "Kassenleitung",
     calculatorPhone: "",
     calculatorComment: "",
@@ -86,7 +85,9 @@ let systemInfo = {
   repositoryUrl: "",
   serverTime: "",
   defaultPasswordsActive: false,
-  defaultPasswordUsernames: []
+  defaultPasswordUsernames: [],
+  hasLogo: false,
+  logoVersion: 0
 };
 let versionCheck = { status: "unchecked", label: "nicht geprüft" };
 let lastCheckout = null;
@@ -123,7 +124,7 @@ applyTheme(themeMode);
 function safeColor(value) {
   return /^#[0-9a-f]{3,8}$/i.test(String(value || "")) ? value : "#999999";
 }
-// safeLogoSrc kommt aus report-shared.js.
+// logoSrc kommt aus report-shared.js.
 
 async function apiFetch(input, init = {}) {
   if (!sessionToken) return fetch(input, init);
@@ -481,7 +482,7 @@ function render() {
 function updateFavicon() {
   const favicon = document.querySelector("#dynamic-favicon");
   if (!favicon) return;
-  favicon.setAttribute("href", state.settings.logoDataUrl || "data:,");
+  favicon.setAttribute("href", logoSrc(systemInfo) || "data:,");
 }
 
 function loginTemplate() {
@@ -625,9 +626,9 @@ function themeMenuTemplate() {
 }
 
 function brandMarkTemplate() {
-  const logoSrc = safeLogoSrc(state.settings.logoDataUrl);
-  if (logoSrc) {
-    return `<div class="brand-mark logo-mark"><img src="${logoSrc}" alt="Logo" /></div>`;
+  const src = logoSrc(systemInfo);
+  if (src) {
+    return `<div class="brand-mark logo-mark"><img src="${src}" alt="Logo" /></div>`;
   }
 
   return `<div class="brand-mark">Logo</div>`;
@@ -1048,8 +1049,9 @@ function settingsTemplate() {
           <div class="logo-upload-row">
             <input name="logo" type="file" accept="image/*" />
             <div class="logo-preview">
-              ${safeLogoSrc(state.settings.logoDataUrl) ? `<img src="${safeLogoSrc(state.settings.logoDataUrl)}" alt="Logo Vorschau" />` : "<span>Kein Logo hinterlegt</span>"}
+              ${logoSrc(systemInfo) ? `<img src="${logoSrc(systemInfo)}" alt="Logo Vorschau" />` : "<span>Kein Logo hinterlegt</span>"}
             </div>
+            ${systemInfo.hasLogo ? `<button class="ghost-button small-button" type="button" data-remove-logo>Logo entfernen</button>` : ""}
           </div>
         </div>
         <div class="settings-form-title">Kassenhinweis</div>
@@ -1622,6 +1624,7 @@ function bindAdmin() {
     button.addEventListener("click", () => saveSettings(button.dataset.saveSettings || activeAdminSection, button));
   });
   document.querySelector("[data-test-print]")?.addEventListener("click", (event) => testPrint(event.currentTarget));
+  document.querySelector("[data-remove-logo]")?.addEventListener("click", (event) => removeLogo(event.currentTarget));
   document.querySelectorAll("[data-settings-form]").forEach((formElement) => {
     const section = formElement.dataset.settingsSection || activeAdminSection;
     formElement.addEventListener("input", () => markAdminDirty(section));
@@ -1946,6 +1949,55 @@ async function setUserPassword(event) {
   window.setTimeout(() => finishButton(), 1200);
 }
 
+function readFileAsDataUrl(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.addEventListener("load", () => resolve(String(reader.result || "")));
+    reader.addEventListener("error", () => reject(reader.error || new Error("Datei nicht lesbar.")));
+    reader.readAsDataURL(file);
+  });
+}
+
+// Laedt das Logo in seine eigene Datei (siehe /api/logo) und uebernimmt die
+// neue Version in die Systeminfo, damit Vorschau und Favicon nicht das alte
+// Bild aus dem Browser-Cache zeigen.
+async function uploadLogo(file) {
+  let dataUrl = "";
+  try {
+    dataUrl = await readFileAsDataUrl(file);
+  } catch (error) {
+    showToast("Logo konnte nicht gelesen werden.");
+    return false;
+  }
+  const response = await apiFetch("/api/logo", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ dataUrl })
+  });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    showToast(payload.error || "Logo konnte nicht gespeichert werden.");
+    return false;
+  }
+  systemInfo = { ...systemInfo, ...payload };
+  return true;
+}
+
+async function removeLogo(button) {
+  if (!window.confirm("Logo wirklich entfernen?")) return;
+  const finishButton = setButtonState(button, "Entfernen...");
+  const response = await apiFetch("/api/logo", { method: "DELETE" });
+  if (!response.ok) {
+    finishButton();
+    showToast("Logo konnte nicht entfernt werden.");
+    return;
+  }
+  systemInfo = { ...systemInfo, ...(await response.json().catch(() => ({}))) };
+  updateFavicon();
+  showToast("Logo entfernt.");
+  render();
+}
+
 async function saveSettings(section = "settings", button = getAdminSaveButton(section)) {
   const finishButton = setButtonState(button, "Speichern...");
   const formElement = document.querySelector("[data-settings-form]");
@@ -1964,21 +2016,14 @@ async function saveSettings(section = "settings", button = getAdminSaveButton(se
     if (form.has("printOutputDir")) state.settings.printOutputDir = String(form.get("printOutputDir") || "data/prints").trim() || "data/prints";
     const logo = form.get("logo");
     if (logo && logo.size) {
-      const reader = new FileReader();
-      reader.addEventListener("load", async () => {
-    state.settings.logoDataUrl = reader.result;
-        if (!(await saveState())) {
-          finishButton();
-          return;
-        }
-        updateFavicon();
-        clearAdminDirty(section);
-        showToast("Einstellungen gespeichert.");
-        finishButton("Gespeichert");
-        render();
-      });
-      reader.readAsDataURL(logo);
-      return;
+      // Das Logo geht an seinen eigenen Endpunkt und nicht mehr in die
+      // Festdatei - zuerst hochladen, denn schlaegt das fehl, sollen die
+      // uebrigen Einstellungen gar nicht erst gespeichert werden.
+      if (!(await uploadLogo(logo))) {
+        finishButton();
+        return;
+      }
+      updateFavicon();
     }
 
     if (!(await saveState())) {
@@ -2502,7 +2547,6 @@ function resetDayCash() {
     createdAt: new Date().toISOString(),
     eventName: state.settings.eventName,
     clubName: state.settings.clubName,
-    logoDataUrl: state.settings.logoDataUrl,
     total,
     orderCount: orders.length,
     orders: cloneData(orders)

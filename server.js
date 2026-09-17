@@ -20,6 +20,9 @@ const legacyActivePath = path.join(dataDir, "fest.json");
 const printsDir = path.join(dataDir, "prints");
 const defaultsPath = path.join(dataDir, "defaults.json");
 const activePath = path.join(dataDir, "active-event.json");
+// Das Logo liegt bewusst ausserhalb der Festdatei: es machte rund 264 der 280
+// Kilobyte aus, und jede Buchung schreibt die Festdatei vollstaendig neu.
+const logoPath = path.join(dataDir, "logo.json");
 const packagePath = path.join(__dirname, "package.json");
 const latestVersionUrl = process.env.FESTKASSE_LATEST_VERSION_URL || "https://raw.githubusercontent.com/spitzea/Festkasse/main/package.json";
 const defaultSerialPrinterPort = "/dev/ttyUSB0";
@@ -89,7 +92,6 @@ const defaultState = {
     printerPort: defaultSerialPrinterPort,
     printOutputDir: "data/prints",
     receiptFooter: "Vielen Dank!",
-    logoDataUrl: "",
     calculatorName: "Kassenleitung",
     calculatorPhone: "",
     calculatorComment: "",
@@ -154,15 +156,30 @@ async function migrateLegacyDataFiles() {
       active = withReportUser;
       changed = true;
     }
+    const withoutLogo = await extractEmbeddedLogo(active);
+    if (withoutLogo) {
+      active = withoutLogo;
+      changed = true;
+    }
     if (changed) {
       await writeJson(activePath, active);
     }
   }
   if (fs.existsSync(defaultsPath)) {
-    const defaults = await readJson(defaultsPath);
+    let defaults = await readJson(defaultsPath);
+    let changed = false;
     const withReportUser = addReportUserIfMissing(defaults);
     if (withReportUser) {
-      await writeJson(defaultsPath, withReportUser);
+      defaults = withReportUser;
+      changed = true;
+    }
+    const withoutLogo = await extractEmbeddedLogo(defaults);
+    if (withoutLogo) {
+      defaults = withoutLogo;
+      changed = true;
+    }
+    if (changed) {
+      await writeJson(defaultsPath, defaults);
     }
   }
 
@@ -195,6 +212,74 @@ function sanitizeState(state) {
     ...state,
     users: (state.users || []).map(({ passwordHash, passwordSalt, password, ...user }) => user)
   };
+}
+
+// --- Logo -------------------------------------------------------------------
+// Gespeichert wird die Data-URL zerlegt in Typ und Base64, damit /api/logo
+// echte Bilddaten ausliefern kann und nicht noch einmal Base64 durch die
+// Leitung schickt.
+
+function parseLogoDataUrl(value) {
+  const match = /^data:(image\/[a-zA-Z0-9.+-]+);base64,([A-Za-z0-9+/=]+)$/.exec(String(value || "").replace(/\s/g, ""));
+  if (!match) return null;
+  return { mimeType: match[1], base64: match[2] };
+}
+
+function readLogo() {
+  if (!fs.existsSync(logoPath)) return null;
+  try {
+    const logo = JSON.parse(fs.readFileSync(logoPath, "utf8"));
+    if (!logo?.base64 || !logo?.mimeType) return null;
+    return logo;
+  } catch (error) {
+    console.error(`[Festkasse] Logo-Datei unlesbar: ${error.message}`);
+    return null;
+  }
+}
+
+// hasLogo und logoVersion gehen an alle Oberflaechen. Die Version ist die
+// Schreibzeit und haengt als Query am Bild, damit ein neues Logo den
+// Browser-Cache sicher verdraengt.
+function logoInfo() {
+  const logo = readLogo();
+  return { hasLogo: Boolean(logo), logoVersion: logo?.updatedAt || 0 };
+}
+
+async function writeLogoFromDataUrl(dataUrl) {
+  const parsed = parseLogoDataUrl(dataUrl);
+  if (!parsed) {
+    throw Object.assign(new Error("Kein gueltiges Bild. Erwartet wird eine Data-URL mit Bildtyp."), { status: 400 });
+  }
+  await writeJson(logoPath, { ...parsed, updatedAt: Date.now() });
+}
+
+// Aeltere Festdateien, Vorlagen und Tagesabschluesse tragen das Logo noch in
+// settings.logoDataUrl. Beim ersten Anfassen wandert es einmalig in die eigene
+// Datei und wird ueberall herausgeschnitten. Ein bereits vorhandenes Logo
+// gewinnt, damit das Laden einer alten Vorlage nicht das aktuelle ueberschreibt.
+async function extractEmbeddedLogo(state) {
+  const embedded = state?.settings?.logoDataUrl;
+  const hasEmbeddedInReports = (state?.dayReports || []).some((report) => report?.logoDataUrl);
+  if (!embedded && !hasEmbeddedInReports) return null;
+
+  if (embedded && !readLogo()) {
+    try {
+      await writeLogoFromDataUrl(embedded);
+    } catch (error) {
+      console.error(`[Festkasse] Eingebettetes Logo nicht uebernommen: ${error.message}`);
+    }
+  }
+
+  const { logoDataUrl, ...settings } = state.settings || {};
+  return {
+    ...state,
+    settings,
+    dayReports: (state.dayReports || []).map(({ logoDataUrl: reportLogo, ...report }) => report)
+  };
+}
+
+async function withoutEmbeddedLogo(state) {
+  return (await extractEmbeddedLogo(state)) || state;
 }
 
 function hasDefaultPassword(user) {
@@ -263,13 +348,17 @@ function mergeIncomingState(current, incoming, role) {
     };
   }
 
+  // logoDataUrl wird hier bewusst weggeworfen: das Logo hat mit /api/logo eine
+  // eigene Datei, sonst waechst die Festdatei ueber einen alten Client oder
+  // eine alte Vorlage wieder um die 264 Kilobyte an.
+  const { logoDataUrl, ...incomingSettings } = incoming.settings || {};
   return {
     ...base,
     articles: incoming.articles || current.articles,
-    dayReports: incoming.dayReports || current.dayReports,
+    dayReports: (incoming.dayReports || current.dayReports || []).map(({ logoDataUrl: reportLogo, ...report }) => report),
     settings: {
       ...(current.settings || {}),
-      ...(incoming.settings || {})
+      ...incomingSettings
     }
   };
 }
@@ -935,7 +1024,8 @@ function systemInfo(state = {}) {
     repositoryUrl: repositoryUrl(packageMeta),
     serverTime: new Date().toISOString(),
     defaultPasswordsActive: hasAnyDefaultPassword(state),
-    defaultPasswordUsernames: defaultPasswordUsernames(state)
+    defaultPasswordUsernames: defaultPasswordUsernames(state),
+    ...logoInfo()
   };
 }
 
@@ -1065,7 +1155,6 @@ async function handleApi(req, res, urlPath) {
       settings: {
         eventName: settings.eventName || "",
         clubName: settings.clubName || "",
-        logoDataUrl: settings.logoDataUrl || "",
         calculatorName: settings.calculatorName || "",
         calculatorPhone: settings.calculatorPhone || "",
         calculatorComment: settings.calculatorComment || ""
@@ -1073,9 +1162,53 @@ async function handleApi(req, res, urlPath) {
       system: {
         appVersion: readPackageVersion(),
         defaultPasswordsActive: hasAnyDefaultPassword(state),
-        defaultPasswordUsernames: defaultPasswordUsernames(state)
+        defaultPasswordUsernames: defaultPasswordUsernames(state),
+        ...logoInfo()
       }
     });
+    return;
+  }
+
+  // Das Logo steht im Anmeldebildschirm und ist deshalb bewusst ohne Sitzung
+  // abrufbar - genauso wie Fest- und Organisationsname aus /api/bootstrap.
+  if (req.method === "GET" && urlPath === "/api/logo") {
+    const logo = readLogo();
+    if (!logo) {
+      res.writeHead(404, { "Content-Type": "text/plain; charset=utf-8" });
+      res.end("Kein Logo hinterlegt.");
+      return;
+    }
+    const etag = `"${logo.updatedAt || 0}"`;
+    if (req.headers["if-none-match"] === etag) {
+      res.writeHead(304, { ETag: etag });
+      res.end();
+      return;
+    }
+    const body = Buffer.from(logo.base64, "base64");
+    res.writeHead(200, {
+      "Content-Type": logo.mimeType,
+      "Content-Length": body.length,
+      ETag: etag,
+      // Die Oberflaeche haengt die Schreibzeit als ?v= an. Ohne diese Angabe
+      // wird jedes Mal nachgefragt, mit ihr darf der Browser dauerhaft cachen.
+      "Cache-Control": /[?&]v=/.test(req.url || "") ? "public, max-age=31536000, immutable" : "no-cache"
+    });
+    res.end(body);
+    return;
+  }
+
+  if (req.method === "POST" && urlPath === "/api/logo") {
+    if (!requireAdminSession(req, res)) return;
+    const body = await readBody(req);
+    await writeLogoFromDataUrl(body.dataUrl);
+    sendJson(res, 200, logoInfo());
+    return;
+  }
+
+  if (req.method === "DELETE" && urlPath === "/api/logo") {
+    if (!requireAdminSession(req, res)) return;
+    if (fs.existsSync(logoPath)) await fsp.unlink(logoPath);
+    sendJson(res, 200, logoInfo());
     return;
   }
 
@@ -1137,7 +1270,7 @@ async function handleApi(req, res, urlPath) {
     sendJson(res, 200, {
       eventName: state.settings?.eventName || "",
       clubName: state.settings?.clubName || "",
-      logoDataUrl: state.settings?.logoDataUrl || "",
+      ...logoInfo(),
       currency: state.settings?.currency || "EUR",
       report: buildReportData(orders),
       buckets: buildIntervalBuckets(orders),
@@ -1224,7 +1357,9 @@ async function handleApi(req, res, urlPath) {
   if (req.method === "POST" && urlPath === "/api/events/load") {
     if (!requireAdminSession(req, res)) return;
     const body = await readBody(req);
-    const source = body.source === "defaults" ? await readJson(defaultsPath) : await readJson(resolveManagedFile(body.file));
+    const source = await withoutEmbeddedLogo(
+      body.source === "defaults" ? await readJson(defaultsPath) : await readJson(resolveManagedFile(body.file))
+    );
     const nextState = body.mode === "template"
       ? createTemplateState(source)
       : { ...source, settings: { ...(source.settings || {}), activeEventFile: "active-event.json" } };
@@ -1236,7 +1371,9 @@ async function handleApi(req, res, urlPath) {
   if (req.method === "POST" && urlPath === "/api/events/new") {
     if (!requireAdminSession(req, res)) return;
     const body = await readBody(req);
-    const source = body.file ? await readJson(resolveManagedFile(body.file)) : await readJson(defaultsPath);
+    const source = await withoutEmbeddedLogo(
+      body.file ? await readJson(resolveManagedFile(body.file)) : await readJson(defaultsPath)
+    );
     const nextState = createTemplateState(source, body.eventName || "Neues Fest");
     await writeJson(activePath, nextState);
     sendJson(res, 200, { state: sanitizeState(nextState), system: systemInfo(nextState) });

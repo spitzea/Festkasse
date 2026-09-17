@@ -8,6 +8,7 @@ public/app.js          Browser logic and UI rendering
 public/styles.css      Design system, layout and print CSS
 data/defaults.json     Neutral base data and system template, versioned
 data/active-event.json Live runtime state, not versioned
+data/logo.json         Event logo, kept out of the event file, not versioned
 ```
 
 The binding rules for code, data, commits, push and releases are in

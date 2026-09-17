@@ -44,6 +44,7 @@ public/report-shared.js Reporting logic, shared between server and browser
 public/styles.css      Design system, layout and print CSS
 data/defaults.json     Neutral base data, versioned
 data/active-event.json Live register state, not versioned
+data/logo.json         Event logo, served by /api/logo, not versioned
 ```
 
 Logic needed by both the server and the browser belongs in

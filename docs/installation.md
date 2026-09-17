@@ -83,6 +83,7 @@ Die Konfiguration erfolgt im Adminbereich:
 ```text
 data/defaults.json       Neutrale Grunddaten und Systemvorlage
 data/active-event.json   Aktuell geladenes oder laufendes Fest
+data/logo.json           Logo des Festes (getrennt von der Festdatei)
 data/saved/*.json        Gespeicherte Festvorlagen
 data/prints/*.txt        TXT-Testbons und TXT-Auswertungen
 ```
@@ -95,6 +96,12 @@ nicht versioniert. Beim ersten Start legt der Server die Datei automatisch aus
 `data/defaults.json` an. Ebenso ignoriert werden `data/saved` und
 `data/prints`, damit lokale Vorlagen, Vereinsdaten und Testbons nicht
 versehentlich veröffentlicht werden.
+
+Seit Version 1.6.0 liegt das Logo in `data/logo.json` und nicht mehr in der
+Festdatei. Ein vorhandenes Logo wandert beim ersten Start der neuen Version
+automatisch dorthin; die Festdatei schrumpft dadurch erheblich, weil sie bei
+jeder Buchung vollständig neu geschrieben wird. Entfernen lässt sich das Logo
+unter **Admin > Einstellungen**.
 
 ### Hinweis für bestehende Installationen
 

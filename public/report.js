@@ -69,10 +69,10 @@ async function logoutReport() {
 }
 
 function brandTemplate(payload) {
-  const logoSrc = safeLogoSrc(payload.logoDataUrl);
+  const src = logoSrc(payload);
   return `
     <div class="report-brand">
-      ${logoSrc ? `<img class="report-logo" src="${logoSrc}" alt="Logo" />` : ""}
+      ${src ? `<img class="report-logo" src="${src}" alt="Logo" />` : ""}
       <div>
         <h1>${escapeHtml(payload.eventName || "Festkasse")}</h1>
         <p>${escapeHtml(payload.clubName || "")}</p>
