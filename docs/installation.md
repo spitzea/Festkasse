@@ -98,16 +98,22 @@ versehentlich veröffentlicht werden.
 
 ### Hinweis für bestehende Installationen
 
-Frühere Versionen haben `data/active-event.json` mitversioniert. Nehmen Sie die
-Datei einmalig aus der Versionskontrolle, bevor Sie aktualisieren. Der Inhalt
-auf der Festplatte bleibt dabei erhalten:
+Frühere Versionen haben `data/active-event.json` mitversioniert. Beim ersten
+`git pull` auf Version 1.5.0 oder neuer bricht Git deshalb einmalig mit
+`Your local changes to the following files would be overwritten by merge` ab.
+Der Kassenstand geht dabei nicht verloren, das Update kommt nur nicht durch.
+
+Beenden Sie die Kasse und führen Sie einmalig aus:
 
 ```bash
-git rm --cached data/active-event.json
-git commit -m "Laufzeitdaten aus der Versionskontrolle nehmen"
+mv data/active-event.json ../active-event-sicherung.json
+git pull
+mv ../active-event-sicherung.json data/active-event.json
 ```
 
-Legen Sie vorher eine Sicherung an, falls die Kasse bereits Buchungen enthält.
+Danach läuft `git pull` wieder wie gewohnt, und die Datei bleibt dauerhaft aus
+der Versionsverwaltung heraus. Legen Sie vorher eine Sicherung an, falls die
+Kasse bereits Buchungen enthält.
 
 ## Weiterführende Anleitungen
 
