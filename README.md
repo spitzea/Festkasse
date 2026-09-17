@@ -22,6 +22,7 @@ ehrenamtliche Veranstaltungen.
 | **[Funktionen](docs/features.md)** | Ausführliche Übersicht aller Anwendungsfunktionen |
 | **[Screenshots](docs/screenshots.md)** | Kasse, Auswertung und Adminbereich |
 | **[Entwicklung](docs/development.md)** | Technischer Aufbau und lokale Prüfung |
+| **[Mitarbeit](CONTRIBUTING.md)** | Regeln für Code, Daten, Commits, Push und Releases |
 | **[Rechtliche Hinweise](docs/legal.md)** | Haftungsausschluss, Betreiberverantwortung und Lizenz |
 
 ## Projektbeschreibung
