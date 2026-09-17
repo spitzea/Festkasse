@@ -21,8 +21,8 @@ ehrenamtliche Veranstaltungen.
 | **[Raspberry-Pi-Kiosk](docs/raspberry-pi-kiosk.md)** | Automatischer Start, Chromium-Kiosk, Thermodrucker und Herunterfahren |
 | **[Funktionen](docs/features.md)** | Ausführliche Übersicht aller Anwendungsfunktionen |
 | **[Screenshots](docs/screenshots.md)** | Kasse, Auswertung und Adminbereich |
-| **[Entwicklung](docs/development.md)** | Technischer Aufbau und lokale Prüfung |
-| **[Mitarbeit](CONTRIBUTING.md)** | Regeln für Code, Daten, Commits, Push und Releases |
+| **[Entwicklung](docs/development.md)** | Technischer Aufbau und lokale Prüfung (englisch) |
+| **[Mitarbeit](CONTRIBUTING.md)** | Regeln für Code, Daten, Commits, Push und Releases (englisch) |
 | **[Rechtliche Hinweise](docs/legal.md)** | Haftungsausschluss, Betreiberverantwortung und Lizenz |
 
 ## Projektbeschreibung

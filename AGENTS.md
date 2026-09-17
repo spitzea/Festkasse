@@ -1,34 +1,41 @@
-# Hinweise für KI-Assistenten
+# Notes for AI assistants
 
-Diese Datei gilt für jeden KI-Assistenten, der in diesem Repository arbeitet,
-unabhängig vom Werkzeug. Sie ist die einzige Datei dieser Art; werkzeugeigene
-Varianten werden bewusst nicht zusätzlich gepflegt.
+This file applies to every AI assistant working in this repository, regardless
+of the tool. It is the only file of its kind; tool-specific variants are
+deliberately not maintained.
 
-Die verbindlichen Regeln für dieses Projekt stehen in [CONTRIBUTING.md](CONTRIBUTING.md).
-Lies sie, bevor du Code, Daten oder Git-Geschichte änderst. Sie gelten
-unverändert auch für dich.
+The binding rules for this project are in [CONTRIBUTING.md](CONTRIBUTING.md).
+Read them before you change code, data or git history. They apply to you
+unchanged.
 
-Diese Punkte gehen in der Praxis am häufigsten schief:
+These are the points that go wrong most often in practice:
 
-**`data/active-event.json` niemals anfassen.** Die Datei ist der laufende
-Kassenstand eines echten Festes und nicht versioniert. Nicht committen, nicht
-überschreiben, nicht löschen, nicht als Testgrundlage verwenden.
+**Never touch `data/active-event.json`.** The file is the live register state
+of a real event and is not versioned. Do not commit it, do not overwrite it,
+do not delete it, do not use it as a basis for testing.
 
-**Testserver nur mit eigenem Port und eigenem Datenverzeichnis starten.** Ein
-Start gegen `data/` zerstört den Kassenstand.
+**Start a test server only with its own port and its own data directory.**
+Starting against `data/` destroys the register state.
 
-**Kein `git commit -- <datei>` und kein `git commit -a`.** Dateien einzeln mit
-`git add` vormerken, mit `git status` prüfen, dann ohne Pfadangabe committen.
-Die Pfadangabe übergeht den Index und macht ein `git rm --cached` rückgängig.
+**No `git commit -- <file>` and no `git commit -a`.** Stage files individually
+with `git add`, check with `git status`, then commit without a path argument.
+The path argument bypasses the index and undoes a `git rm --cached`.
 
-**Nicht ungefragt pushen.** Veröffentlichen entscheidet der Betreuer.
+**Do not push unless asked.** Publishing is the maintainer's decision.
 
-**Auf parallele Sitzungen achten.** Mehrere Assistenten teilen sich dieses
-Arbeitsverzeichnis. Vor einem Branch-Wechsel, einem `git reset` oder dem
-Beenden eines Node-Prozesses prüfen, ob jemand anderes daran arbeitet. Für
-längere Arbeiten ein eigenes Worktree anlegen.
+**Watch out for parallel sessions.** Several assistants share this working
+directory. Before switching branches, running `git reset` or killing a Node
+process, check whether somebody else is working on it. For longer work, create
+your own worktree.
 
-**Rechte gehören auf den Server.** Die Oberfläche blendet Bedienelemente nur
-aus, das ersetzt keine Prüfung in `handleApi`.
+**Permissions belong on the server.** The interface only hides controls; that
+is no substitute for a check in `handleApi`.
 
-**Deutsch schreiben.** Oberfläche, Dokumentation und Commit-Nachrichten.
+**Mind the language split.** English for contributor-facing text: commit
+messages, issues, this file, `CONTRIBUTING.md`, `docs/development.md`. German
+for operator-facing text: the user interface, `README.md`, release notes and
+the installation and operating guides under `docs/`.
+
+**Check the product decisions before reporting a finding.** `CONTRIBUTING.md`
+lists things that look like defects but are deliberate, among them the default
+passwords that are not forced to change. Do not raise them again.

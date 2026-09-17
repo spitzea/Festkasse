@@ -1,34 +1,50 @@
-# Entwicklung
+# Development
 
-Die Anwendung nutzt bewusst keine Frontend-Frameworks.
+The application deliberately uses no frontend frameworks.
 
 ```text
-server.js              Node-HTTP-Server, JSON-Daten, Anmeldung und Druck-Endpunkte
-public/app.js          Browserlogik und UI-Rendering
-public/styles.css      Designsystem, Layout und Print-CSS
-data/defaults.json     Neutrale Grunddaten und Systemvorlage, versioniert
-data/active-event.json Aktueller Laufzeitstand, nicht versioniert
+server.js              Node HTTP server, JSON data, login and print endpoints
+public/app.js          Browser logic and UI rendering
+public/styles.css      Design system, layout and print CSS
+data/defaults.json     Neutral base data and system template, versioned
+data/active-event.json Live runtime state, not versioned
 ```
 
-Die verbindlichen Regeln für Code, Daten, Commits, Push und Releases stehen in
+The binding rules for code, data, commits, push and releases are in
 [CONTRIBUTING.md](../CONTRIBUTING.md).
 
-## Lokale Qualitätsprüfung
+## Local quality check
 
-Vor einem Commit sollten mindestens die JavaScript-Dateien auf Syntaxfehler
-geprüft werden:
+Before a commit, at least check the JavaScript files for syntax errors:
 
 ```bash
 node --check server.js
 node --check public/app.js
+node --check public/report-shared.js
 ```
 
-Anwendung lokal starten:
+Start the application locally:
 
 ```bash
 npm start
 ```
 
-Die Anwendung ist anschließend unter `http://localhost:3000` erreichbar.
+It is then reachable at `http://localhost:3000`.
 
-[Zurück zur README](../README.md)
+## Testing without touching the live state
+
+The data directory is fixed to `data/` next to `server.js`, so a test server
+started in the repository writes to the live register state. Work on a copy
+instead:
+
+```bash
+git ls-files | tar -cf - -T - | (mkdir -p ../Festkasse-Test && tar -xf - -C ../Festkasse-Test)
+cd ../Festkasse-Test
+PORT=3100 node server.js
+```
+
+The copy contains `data/defaults.json` but no `data/active-event.json`, so the
+server creates a fresh, neutral state on first start. Delete the directory when
+you are done.
+
+[Back to the README](../README.md)
