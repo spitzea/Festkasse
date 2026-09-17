@@ -232,14 +232,28 @@ function parseLogoDataUrl(value) {
   return { mimeType: match[1], base64: match[2] };
 }
 
+// Gepuffert nach Aenderungszeit: readLogo haengt ueber logoInfo an jeder
+// Antwort auf POST /api/state, also an jeder Buchung. Ohne Puffer liest und
+// zerlegt der Server dabei jedes Mal die vollstaendige Logodatei - bei einem
+// ueblichen Vereinslogo rund 270 KB Base64.
+let logoCache = null;
+
 function readLogo() {
-  if (!fs.existsSync(logoPath)) return null;
+  let stats;
+  try {
+    stats = fs.statSync(logoPath);
+  } catch (error) {
+    logoCache = null;
+    return null;
+  }
+  if (logoCache && logoCache.mtimeMs === stats.mtimeMs) return logoCache.logo;
   try {
     const logo = JSON.parse(fs.readFileSync(logoPath, "utf8"));
-    if (!logo?.base64 || !logo?.mimeType) return null;
-    return logo;
+    logoCache = { mtimeMs: stats.mtimeMs, logo: logo?.base64 && logo?.mimeType ? logo : null };
+    return logoCache.logo;
   } catch (error) {
     console.error(`[Festkasse] Logo-Datei unlesbar: ${error.message}`);
+    logoCache = { mtimeMs: stats.mtimeMs, logo: null };
     return null;
   }
 }
@@ -1170,18 +1184,34 @@ function detectLanUrl() {
   return { ip: null, port, url: null };
 }
 
+// Plattform, Version, Git-Stand und Paketdaten aendern sich waehrend der
+// Laufzeit nicht. Frueher liefen pro Buchung ein git-Unterprozess und zwei
+// Lesevorgaenge auf package.json, weil systemInfo an jeder Antwort auf
+// POST /api/state haengt. Nach einem Update startet der Dienst neu, damit ist
+// auch der angezeigte Git-Stand wieder aktuell.
+let staticSystemInfoCache = null;
+
+function staticSystemInfo() {
+  if (!staticSystemInfoCache) {
+    const packageMeta = readPackageMeta();
+    staticSystemInfoCache = {
+      platform: process.platform,
+      canShutdown: process.platform === "linux",
+      canSetSystemTime: process.platform === "linux",
+      appVersion: readPackageVersion(),
+      gitCommit: readGitCommit(),
+      nodeVersion: process.version,
+      license: packageMeta.license || "MIT",
+      copyright: "Copyright (c) Andreas Spitzenberg",
+      repositoryUrl: repositoryUrl(packageMeta)
+    };
+  }
+  return staticSystemInfoCache;
+}
+
 function systemInfo(state = {}) {
-  const packageMeta = readPackageMeta();
   return {
-    platform: process.platform,
-    canShutdown: process.platform === "linux",
-    canSetSystemTime: process.platform === "linux",
-    appVersion: readPackageVersion(),
-    gitCommit: readGitCommit(),
-    nodeVersion: process.version,
-    license: packageMeta.license || "MIT",
-    copyright: "Copyright (c) Andreas Spitzenberg",
-    repositoryUrl: repositoryUrl(packageMeta),
+    ...staticSystemInfo(),
     serverTime: new Date().toISOString(),
     defaultPasswordsActive: hasAnyDefaultPassword(state),
     defaultPasswordUsernames: defaultPasswordUsernames(state),
