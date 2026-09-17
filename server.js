@@ -227,28 +227,51 @@ function defaultPasswordUsernames(state) {
   return (state.users || []).filter(hasDefaultPassword).map((user) => user.username);
 }
 
-function mergeIncomingState(current, incoming) {
-  return {
+// Nur der Bestand vorhandener Artikel darf von der Kassenrolle geschrieben
+// werden - Name, Preis, Kategorie, Warnbestand etc. kommen unveraendert vom
+// Server, neue/geloeschte Artikel werden ignoriert.
+function applyArticleStockOnly(currentArticles, incomingArticles) {
+  const incomingStockById = new Map((incomingArticles || []).map((article) => [article.id, article.stock]));
+  return (currentArticles || []).map((article) => {
+    const incomingStock = incomingStockById.get(article.id);
+    return typeof incomingStock === "number" ? { ...article, stock: incomingStock } : article;
+  });
+}
+
+// Der Client schickt bei jedem Speichern immer den kompletten lokalen
+// Zustand mit, nicht nur ein Diff - ohne serverseitige Rollenpruefung koennte
+// sich eine Kassensitzung damit z.B. selbst zur Admin-Rolle machen oder
+// Preise/Einstellungen aendern. `users` wird grundsaetzlich nie von hier
+// uebernommen (Benutzerverwaltung laeuft ausschliesslich ueber die
+// adminpflichtigen /api/users/*-Endpunkte).
+function mergeIncomingState(current, incoming, role) {
+  const base = {
     ...current,
-    ...incoming,
-    users: preserveUserSecrets(current.users || [], incoming.users || current.users || []),
+    orders: incoming.orders || current.orders,
+    cancellations: incoming.cancellations || current.cancellations,
+    users: current.users
+  };
+
+  if (role !== "admin") {
+    return {
+      ...base,
+      articles: applyArticleStockOnly(current.articles, incoming.articles),
+      settings: {
+        ...(current.settings || {}),
+        nextReceiptNumber: incoming.settings?.nextReceiptNumber ?? current.settings?.nextReceiptNumber
+      }
+    };
+  }
+
+  return {
+    ...base,
+    articles: incoming.articles || current.articles,
+    dayReports: incoming.dayReports || current.dayReports,
     settings: {
       ...(current.settings || {}),
       ...(incoming.settings || {})
     }
   };
-}
-
-function preserveUserSecrets(currentUsers, incomingUsers) {
-  return incomingUsers.map((incomingUser) => {
-    const existing = currentUsers.find((user) => user.id === incomingUser.id || user.username === incomingUser.username);
-    return {
-      ...existing,
-      ...incomingUser,
-      passwordSalt: incomingUser.passwordSalt || existing?.passwordSalt,
-      passwordHash: incomingUser.passwordHash || existing?.passwordHash
-    };
-  });
 }
 
 function hashPassword(password, salt) {
@@ -994,10 +1017,11 @@ async function handleApi(req, res, urlPath) {
   }
 
   if (req.method === "POST" && urlPath === "/api/state") {
-    if (!requireWriteSession(req, res)) return;
+    const session = requireWriteSession(req, res);
+    if (!session) return;
     const body = await readBody(req);
     const current = await readJson(activePath);
-    const nextState = mergeIncomingState(current, body.state || {});
+    const nextState = mergeIncomingState(current, body.state || {}, session.role);
     nextState.settings = { ...(nextState.settings || {}), updatedAt: new Date().toISOString() };
     await writeJson(activePath, nextState);
     sendJson(res, 200, { state: sanitizeState(nextState), system: systemInfo(nextState) });
