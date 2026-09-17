@@ -121,8 +121,9 @@ function setThemeMode(mode) {
 }
 
 applyTheme(themeMode);
-// escapeHtml, moneyText, filterPaidOrdersForDate, totalsByMode, buildReportData
-// und buildIntervalBuckets kommen aus report-shared.js (vor app.js eingebunden).
+// escapeHtml, moneyText, businessDayKey, businessDayLabel,
+// filterPaidOrdersForBusinessDay, totalsByMode, buildReportData und
+// buildIntervalBuckets kommen aus report-shared.js (vor app.js eingebunden).
 
 function safeColor(value) {
   return /^#[0-9a-f]{3,8}$/i.test(String(value || "")) ? value : "#999999";
@@ -361,7 +362,7 @@ function uid(prefix) {
 }
 
 function todayOrders() {
-  return filterPaidOrdersForDate(state.orders, new Date().toISOString().slice(0, 10));
+  return filterPaidOrdersForBusinessDay(state.orders, businessDayKey(new Date()));
 }
 // buildReportData kommt aus report-shared.js.
 
@@ -957,7 +958,7 @@ function analysisTemplate() {
       <div class="panel-header">
         <div>
           <h2>Tagesauswertung</h2>
-          <p>Summe, normal und kostenlos auf einen Blick.</p>
+          <p>Betriebstag ${escapeHtml(businessDayLabel(businessDayKey(new Date())))}, 5 Uhr morgens bis 5 Uhr morgens.</p>
         </div>
         <button class="action-button" data-print-report>Auswertung drucken</button>
         <button class="danger-button" data-reset-day ${orders.length ? "" : "disabled"}>Tageskasse abschließen</button>
@@ -995,7 +996,7 @@ function dayReportHistoryTemplate() {
           <article class="history-card">
             <div>
               <strong>${escapeHtml(report.eventName)}</strong>
-              <span>${new Date(report.createdAt).toLocaleString("de-DE")} - ${report.orderCount} Buchungen - ${money(report.total)}</span>
+              <span>${report.businessDay ? `Betriebstag ${escapeHtml(businessDayLabel(report.businessDay))} - ` : ""}abgeschlossen ${new Date(report.createdAt).toLocaleString("de-DE")}${report.automatic ? " (automatisch)" : ""} - ${report.orderCount} Buchungen - ${money(report.total)}</span>
             </div>
             <div class="history-actions">
               <button class="action-button small-button" data-print-history="${escapeHtml(report.id)}">Drucken</button>
@@ -2640,12 +2641,14 @@ async function setSystemDateTime(event) {
 function resetDayCash() {
   const orders = todayOrders();
   if (!orders.length) return;
+  const businessDay = businessDayKey(new Date());
   const total = orders.reduce((sum, order) => sum + order.total, 0);
-  const confirmed = window.confirm(`Tageskasse wirklich abschließen?\n\n${orders.length} Buchungen werden als historischer Tagesabschluss gespeichert.\nUmsatz: ${money(total)}`);
+  const confirmed = window.confirm(`Tageskasse wirklich abschließen?\n\nBetriebstag ${businessDayLabel(businessDay)}\n${orders.length} Buchungen werden als historischer Tagesabschluss gespeichert.\nUmsatz: ${money(total)}`);
   if (!confirmed) return;
 
   state.dayReports.unshift({
     id: uid("day"),
+    businessDay,
     createdAt: new Date().toISOString(),
     eventName: state.settings.eventName,
     clubName: state.settings.clubName,

@@ -25,8 +25,40 @@ function moneyText(value, currency = "EUR") {
   return new Intl.NumberFormat("de-DE", { style: "currency", currency }).format(Number(value) || 0);
 }
 
-function filterPaidOrdersForDate(orders, dateStr) {
-  return (orders || []).filter((order) => order.createdAt.slice(0, 10) === dateStr && order.status === "paid");
+// Ein Kassentag laeuft von 05:00 bis 05:00 und nicht von Mitternacht bis
+// Mitternacht. Ein Fest endet regelmaessig erst nach Mitternacht - an der
+// Zellhaeuser Kerb lag die staerkste Stunde zwischen 00:00 und 01:00 - und ein
+// Schnitt um Mitternacht wuerde denselben Abend in zwei Berichte zerlegen. Um
+// 05:00 bucht garantiert niemand mehr.
+const BUSINESS_DAY_START_HOUR = 5;
+
+// Der Betriebstag, zu dem ein Zeitpunkt gehoert, als "JJJJ-MM-TT". Gerechnet
+// wird in Ortszeit: die Buchungen stehen zwar als UTC-ISO-String in der Datei,
+// der Kassenzettel meint aber immer die Uhr an der Wand.
+function businessDayKey(dateInput) {
+  const date = new Date(dateInput);
+  if (Number.isNaN(date.getTime())) return "";
+  const shifted = new Date(date.getTime() - BUSINESS_DAY_START_HOUR * 60 * 60 * 1000);
+  const month = String(shifted.getMonth() + 1).padStart(2, "0");
+  const day = String(shifted.getDate()).padStart(2, "0");
+  return `${shifted.getFullYear()}-${month}-${day}`;
+}
+
+// Zeitpunkt, an dem der Betriebstag endet - also der naechste Morgen um 05:00.
+function businessDayEnd(key) {
+  const [year, month, day] = String(key).split("-").map(Number);
+  if (!year || !month || !day) return new Date(NaN);
+  return new Date(year, month - 1, day + 1, BUSINESS_DAY_START_HOUR, 0, 0, 0);
+}
+
+function businessDayLabel(key) {
+  const [year, month, day] = String(key).split("-").map(Number);
+  if (!year || !month || !day) return "";
+  return `${day}.${month}.${year}`;
+}
+
+function filterPaidOrdersForBusinessDay(orders, key) {
+  return (orders || []).filter((order) => order.status === "paid" && businessDayKey(order.createdAt) === key);
 }
 
 function totalsByMode(orders, isFree) {
@@ -194,7 +226,12 @@ if (typeof module !== "undefined" && module.exports) {
     escapeHtml,
     logoSrc,
     moneyText,
-    filterPaidOrdersForDate,
+    BUSINESS_DAY_START_HOUR,
+    businessDayKey,
+    businessDayEnd,
+    businessDayLabel,
+    filterPaidOrdersForBusinessDay,
+    attachStock,
     totalsByMode,
     buildReportData,
     buildIntervalBuckets,

@@ -26,10 +26,26 @@
 - Getrennte Auswertung normaler und kostenloser Buchungen
 - Gesamtumsatz und Anzahl ausgegebener Artikel
 - Tageskassenabschluss mit historischem Tagesabschluss
+- Automatischer Tagesabschluss zum Ende des Betriebstags
 - Erneutes Anzeigen und Drucken abgeschlossener Tageskassen
 - Eigene, nur lesende Live-Auswertungsseite (`/report`) für die Berichts-Rolle,
   unabhängig und parallel zur Kassensitzung nutzbar (kein Konflikt mit der
   Ein-Sitzung-Sperre der Kasse)
+
+### Betriebstag
+
+Ein Kassentag läuft nicht von Mitternacht bis Mitternacht, sondern von 5 Uhr
+morgens bis 5 Uhr morgens. Ein Fest endet regelmäßig erst nach Mitternacht;
+ein Schnitt um 00:00 Uhr würde denselben Abend in zwei Auswertungen zerlegen.
+
+Buchungen aus einem beendeten Betriebstag verschiebt die Kasse selbsttätig in
+einen historischen Tagesabschluss - um 5 Uhr morgens, oder beim nächsten Start,
+falls der Rechner zu diesem Zeitpunkt aus war. Die Bestände bleiben dabei
+stehen, denn Nachfüllen ist eine Entscheidung des Personals. Der Bestand zum
+Zeitpunkt des Abschlusses wird im Tagesabschluss festgehalten.
+
+Der Abschluss über **Tageskasse abschließen** bleibt unverändert möglich und
+setzt wie bisher alle Bestände zurück.
 
 ## Drucken
 

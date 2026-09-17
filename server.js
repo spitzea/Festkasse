@@ -9,7 +9,14 @@ const crypto = require("crypto");
 const https = require("https");
 const os = require("os");
 const { execFile, execFileSync } = require("child_process");
-const { filterPaidOrdersForDate, buildReportData, buildIntervalBuckets } = require("./public/report-shared.js");
+const {
+  businessDayKey,
+  businessDayEnd,
+  businessDayLabel,
+  filterPaidOrdersForBusinessDay,
+  buildReportData,
+  buildIntervalBuckets
+} = require("./public/report-shared.js");
 
 const port = process.env.PORT || 3000;
 const publicDir = path.join(__dirname, "public");
@@ -361,6 +368,110 @@ function mergeIncomingState(current, incoming, role) {
       ...incomingSettings
     }
   };
+}
+
+// Automatischer Tagesabschluss
+//
+// Ein Betriebstag endet um 05:00 (siehe report-shared.js). Buchungen aus einem
+// abgelaufenen Betriebstag gehoeren nicht mehr in die laufende Tagesauswertung,
+// wandern also in einen historischen Tagesabschluss. Anders als beim manuellen
+// Abschluss bleiben die Bestaende dabei stehen: Nachfuellen ist eine
+// Entscheidung von Menschen, die der Server nicht treffen kann.
+//
+// Die Funktion ist absichtlich idempotent und laeuft bei jedem Schreibzugriff
+// mit. Eine Kasse, die seit gestern offen steht, schickt ihren alten Stand
+// beim naechsten Speichern komplett mit - ohne diese Normalisierung waeren die
+// abgeschlossenen Buchungen damit wieder zurueck im laufenden Tag.
+function closeFinishedBusinessDays(state, now = new Date()) {
+  const currentKey = businessDayKey(now);
+  const orders = state.orders || [];
+  // Nur bezahlte Buchungen, genau wie beim manuellen Abschluss - der Bericht
+  // rechnet spaeter ueber genau diese Liste.
+  const expired = orders.filter((order) => {
+    const key = businessDayKey(order.createdAt);
+    return order.status === "paid" && key && key < currentKey;
+  });
+  if (!expired.length) return null;
+
+  const dayReports = [...(state.dayReports || [])];
+  const stockByArticleId = Object.fromEntries((state.articles || []).map((article) => [article.id, article.stock]));
+  const keys = [...new Set(expired.map((order) => businessDayKey(order.createdAt)))].sort();
+  const closed = [];
+
+  for (const key of keys) {
+    const dayOrders = expired.filter((order) => businessDayKey(order.createdAt) === key);
+    const existingIndex = dayReports.findIndex((report) => report.businessDay === key);
+
+    if (existingIndex >= 0) {
+      // Nachzuegler eines alten Clients gehoeren in den vorhandenen Abschluss
+      // und nicht in einen zweiten Bericht fuer denselben Tag.
+      const existing = dayReports[existingIndex];
+      const known = new Set((existing.orders || []).map((order) => order.id));
+      const added = dayOrders.filter((order) => !known.has(order.id));
+      if (added.length) {
+        const merged = [...(existing.orders || []), ...added];
+        dayReports[existingIndex] = {
+          ...existing,
+          orders: merged,
+          orderCount: merged.length,
+          total: merged.reduce((sum, order) => sum + (Number(order.total) || 0), 0)
+        };
+        closed.push({ key, count: added.length, merged: true });
+      }
+      continue;
+    }
+
+    dayReports.unshift({
+      id: `day_${Date.now()}_${crypto.randomBytes(3).toString("hex")}`,
+      businessDay: key,
+      createdAt: businessDayEnd(key).toISOString(),
+      automatic: true,
+      eventName: state.settings?.eventName || "",
+      clubName: state.settings?.clubName || "",
+      total: dayOrders.reduce((sum, order) => sum + (Number(order.total) || 0), 0),
+      orderCount: dayOrders.length,
+      orders: dayOrders,
+      stockByArticleId
+    });
+    closed.push({ key, count: dayOrders.length, merged: false });
+  }
+
+  const expiredIds = new Set(expired.map((order) => order.id));
+  return {
+    state: { ...state, orders: orders.filter((order) => !expiredIds.has(order.id)), dayReports },
+    closed
+  };
+}
+
+function logBusinessDayClose(closed) {
+  for (const entry of closed) {
+    console.log(
+      `[Festkasse] Tagesabschluss automatisch: Betriebstag ${businessDayLabel(entry.key)}, ` +
+      `${entry.count} Buchung(en)${entry.merged ? " nachgetragen" : ""} | ${new Date().toISOString()}`
+    );
+  }
+}
+
+// Abschluss zur Schnittzeit. Laeuft der Pi zu diesem Zeitpunkt nicht, holt ihn
+// der naechste Schreibzugriff oder der Start des Servers nach.
+async function runBusinessDayClose() {
+  const state = await readJson(activePath);
+  const result = closeFinishedBusinessDays(state);
+  if (!result) return;
+  await writeJson(activePath, result.state);
+  logBusinessDayClose(result.closed);
+}
+
+function scheduleBusinessDayClose() {
+  const now = new Date();
+  // Eine Minute Abstand zur Schnittzeit, damit eine leicht nachgehende Uhr
+  // den Tag nicht eine Sekunde zu frueh abschliesst.
+  const next = businessDayEnd(businessDayKey(now)).getTime() + 60 * 1000;
+  setTimeout(() => {
+    runBusinessDayClose()
+      .catch((error) => console.error("[Festkasse] Automatischer Tagesabschluss fehlgeschlagen:", error))
+      .finally(scheduleBusinessDayClose);
+  }, Math.max(1000, next - now.getTime()));
 }
 
 function hashPassword(password, salt) {
@@ -1282,8 +1393,13 @@ async function handleApi(req, res, urlPath) {
     if (!session) return;
     const body = await readBody(req);
     const current = await readJson(activePath);
-    const nextState = mergeIncomingState(current, body.state || {}, session.role);
+    let nextState = mergeIncomingState(current, body.state || {}, session.role);
     nextState.settings = { ...(nextState.settings || {}), updatedAt: new Date().toISOString() };
+    const closeResult = closeFinishedBusinessDays(nextState);
+    if (closeResult) {
+      nextState = closeResult.state;
+      logBusinessDayClose(closeResult.closed);
+    }
     await writeJson(activePath, nextState);
     sendJson(res, 200, { state: sanitizeState(nextState), system: systemInfo(nextState) });
     return;
@@ -1293,8 +1409,8 @@ async function handleApi(req, res, urlPath) {
     const session = requireSession(req, res);
     if (!session) return;
     const state = await readJson(activePath);
-    const today = new Date().toISOString().slice(0, 10);
-    const orders = filterPaidOrdersForDate(state.orders || [], today);
+    const today = businessDayKey(new Date());
+    const orders = filterPaidOrdersForBusinessDay(state.orders || [], today);
     // Trace: Zugriffe auf den Live-Bericht sind schwer zu reproduzieren
     // (separates Geraet/Tab, eigene Session), daher hier sichtbar im
     // Server-Terminal protokollieren, wer wann abgerufen hat.
@@ -1644,7 +1760,11 @@ server.on("error", (error) => {
   throw error;
 });
 
-ensureDataFiles().then(() => {
+ensureDataFiles().then(async () => {
+  // War die Kasse zur Schnittzeit aus, wird der Abschluss beim Start
+  // nachgeholt, bevor die erste Anfrage beantwortet wird.
+  await runBusinessDayClose();
+  scheduleBusinessDayClose();
   server.listen(port, () => {
     console.log(`Festkasse Community Edition läuft auf http://localhost:${port}`);
   });
