@@ -1198,6 +1198,7 @@ function printSettingsTemplate() {
         <div class="field">
           <label>Textdatei-Verzeichnis</label>
           <input name="printOutputDir" value="${escapeHtml(state.settings.printOutputDir || "data/prints")}" />
+          <small>Relativ zum Programmverzeichnis. Pfade ausserhalb werden auf <code>data/prints</code> zurückgesetzt.</small>
         </div>
         <div class="field settings-test-print">
           <button class="action-button" type="button" data-test-print>Testbon schreiben</button>
@@ -2267,7 +2268,8 @@ async function printReceipt(receipts, total, isFree, receiptTime = new Date()) {
     const response = await apiFetch("/api/print/receipts", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ settings: state.settings, receipts })
+      // Druckeinstellungen liest der Server aus der Festdatei, nicht aus der Anfrage.
+      body: JSON.stringify({ receipts })
     });
     if (!response.ok) {
       const payload = await response.json().catch(() => ({}));
@@ -2294,8 +2296,8 @@ async function printReceipt(receipts, total, isFree, receiptTime = new Date()) {
 async function testPrint(button) {
   const formElement = document.querySelector("[data-settings-form]");
   const form = formElement ? new FormData(formElement) : new FormData();
+  // Nur die drei Druckfelder gehen an den Server - mehr nimmt er nicht an.
   const settings = {
-    ...state.settings,
     printerMode: String(form.get("printerMode") || state.settings.printerMode || "browser"),
     printerPort: String(form.get("printerPort") || state.settings.printerPort || "/dev/ttyUSB0").trim(),
     printOutputDir: String(form.get("printOutputDir") || state.settings.printOutputDir || "data/prints").trim()
@@ -2390,7 +2392,7 @@ async function printReportTextFile(report) {
   const response = await apiFetch("/api/print/report", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ settings: state.settings, report })
+    body: JSON.stringify({ report })
   });
   const payload = await response.json().catch(() => ({}));
   if (!response.ok) {

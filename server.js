@@ -452,9 +452,35 @@ function safePrintFileName(prefix = "bon") {
   return `${prefix}-${stamp}-${random}.txt`;
 }
 
+// Das Ausgabeverzeichnis darf das Projektverzeichnis nicht verlassen. Sonst
+// genuegt ein "printOutputDir" in einer Anfrage, um per mkdir -p irgendwo im
+// Dateisystem ein Verzeichnis anzulegen und Bons hineinzuschreiben. Wer
+// bewusst woanders hin schreiben will, setzt FESTKASSE_PRINT_DIR am Server.
 function resolvePrintOutputDir(configuredDir) {
+  if (process.env.FESTKASSE_PRINT_DIR) {
+    return path.resolve(process.env.FESTKASSE_PRINT_DIR);
+  }
   const rawDir = String(configuredDir || "data/prints").trim() || "data/prints";
-  return path.isAbsolute(rawDir) ? rawDir : path.join(__dirname, rawDir);
+  const resolved = path.resolve(__dirname, rawDir);
+  const relative = path.relative(__dirname, resolved);
+  if (relative && (relative === ".." || relative.startsWith(`..${path.sep}`) || path.isAbsolute(relative))) {
+    console.warn(`[Festkasse] Ausgabeverzeichnis "${rawDir}" liegt ausserhalb des Projekts, benutze data/prints.`);
+    return printsDir;
+  }
+  return resolved;
+}
+
+// Analog fuer die serielle Schnittstelle: ohne Muster laesst sich ueber
+// printerPort ein beliebiger Pfad oeffnen bzw. per fsp.access abfragen, ob er
+// existiert und beschreibbar ist.
+function resolvePrinterPort(configuredPort) {
+  const rawPort = String(configuredPort || "").trim();
+  if (/^\/dev\/[A-Za-z0-9._-]+$/.test(rawPort)) return rawPort;
+  if (/^COM[0-9]+$/i.test(rawPort)) return rawPort.toUpperCase();
+  if (rawPort) {
+    console.warn(`[Festkasse] Schnittstelle "${rawPort}" ist kein gueltiger Geraetepfad, benutze ${defaultSerialPrinterPort}.`);
+  }
+  return defaultSerialPrinterPort;
 }
 
 function padText(text, width, align = "left") {
@@ -686,7 +712,7 @@ function serialErrorMessage(error, portPath) {
 
 async function writeSerialPrinterJobs(jobs, settings) {
   const SerialPort = loadSerialPort();
-  const portPath = String(settings.printerPort || defaultSerialPrinterPort).trim() || defaultSerialPrinterPort;
+  const portPath = resolvePrinterPort(settings.printerPort);
   const serialPort = new SerialPort({
     path: portPath,
     baudRate: 9600,
@@ -751,7 +777,7 @@ async function printerStatus(settings) {
     return { mode, online: true, label: mode === "textfile" ? "Textdatei" : "Browserdruck" };
   }
 
-  const portPath = String(settings.printerPort || defaultSerialPrinterPort).trim() || defaultSerialPrinterPort;
+  const portPath = resolvePrinterPort(settings.printerPort);
   try {
     loadSerialPort();
     await fsp.access(portPath, fs.constants.R_OK | fs.constants.W_OK);
@@ -781,6 +807,18 @@ async function writeReportTextFile(report, settings) {
   const filePath = path.join(outputDir, safePrintFileName("auswertung"));
   await fsp.writeFile(filePath, formatReportText(report, settings), "utf8");
   return filePath;
+}
+
+// Whitelist fuer den Testdruck: nur die drei Druckfelder, nichts sonst aus
+// der Anfrage. Nicht gesetzte Felder bleiben weg, damit die gespeicherten
+// Einstellungen greifen.
+function testPrintSettings(incoming) {
+  const allowedModes = ["browser", "textfile", "serial"];
+  const settings = {};
+  if (allowedModes.includes(incoming?.printerMode)) settings.printerMode = incoming.printerMode;
+  if (incoming?.printerPort) settings.printerPort = resolvePrinterPort(incoming.printerPort);
+  if (incoming?.printOutputDir) settings.printOutputDir = String(incoming.printOutputDir).trim();
+  return settings;
 }
 
 function resolveManagedFile(fileName) {
@@ -1193,7 +1231,7 @@ async function handleApi(req, res, urlPath) {
     if (!requireWriteSession(req, res)) return;
     const body = await readBody(req);
     const state = await readJson(activePath);
-    const settings = { ...(state.settings || {}), ...(body.settings || {}) };
+    const settings = state.settings || {};
     const mode = settings.printerMode || "browser";
 
     if (mode === "textfile") {
@@ -1216,7 +1254,7 @@ async function handleApi(req, res, urlPath) {
     if (!requireAdminSession(req, res)) return;
     const body = await readBody(req);
     const state = await readJson(activePath);
-    const settings = { ...(state.settings || {}), ...(body.settings || {}) };
+    const settings = state.settings || {};
     const mode = settings.printerMode || "browser";
 
     if (mode === "textfile") {
@@ -1239,7 +1277,12 @@ async function handleApi(req, res, urlPath) {
     if (!requireAdminSession(req, res)) return;
     const body = await readBody(req);
     const state = await readJson(activePath);
-    const settings = { ...(state.settings || {}), ...(body.settings || {}) };
+    // Der Testdruck soll die im Formular eingetragenen, noch nicht
+    // gespeicherten Druckeinstellungen pruefen. Deshalb - und nur hier -
+    // werden genau diese drei Felder aus der Anfrage uebernommen; sie laufen
+    // ueber resolvePrintOutputDir/resolvePrinterPort und koennen das
+    // Projektverzeichnis nicht verlassen.
+    const settings = { ...(state.settings || {}), ...testPrintSettings(body.settings) };
     const mode = settings.printerMode || "browser";
     const receipt = {
       articleName: "Testbon Festkasse",
