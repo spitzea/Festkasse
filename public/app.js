@@ -756,9 +756,9 @@ function cartRowTemplate(item) {
         <span>${item.quantity} x ${money(item.unitPrice)} = ${money(item.quantity * item.unitPrice)}</span>
       </div>
       <div class="cart-controls">
-        <button class="qty-button" data-dec="${item.articleId}">-</button>
-        <button class="qty-button" data-inc="${item.articleId}">+</button>
-        <button class="qty-button" data-remove="${item.articleId}">x</button>
+        <button class="qty-button" data-dec="${escapeHtml(item.articleId)}">-</button>
+        <button class="qty-button" data-inc="${escapeHtml(item.articleId)}">+</button>
+        <button class="qty-button" data-remove="${escapeHtml(item.articleId)}">x</button>
       </div>
     </div>
   `;
@@ -963,8 +963,8 @@ function dayReportHistoryTemplate() {
               <span>${new Date(report.createdAt).toLocaleString("de-DE")} - ${report.orderCount} Buchungen - ${money(report.total)}</span>
             </div>
             <div class="history-actions">
-              <button class="action-button small-button" data-print-history="${report.id}">Drucken</button>
-              <button class="danger-button small-button" data-delete-history="${report.id}">Endgültig löschen</button>
+              <button class="action-button small-button" data-print-history="${escapeHtml(report.id)}">Drucken</button>
+              <button class="danger-button small-button" data-delete-history="${escapeHtml(report.id)}">Endgültig löschen</button>
             </div>
             <details class="history-details">
               <summary>Details anzeigen</summary>
@@ -1157,7 +1157,7 @@ function infoTemplate() {
       </div>
       <table class="info-table">
         <tbody>
-          ${rows.map(([label, value]) => `<tr><th>${label}</th><td>${value}</td></tr>`).join("")}
+          ${rows.map(([label, value]) => `<tr><th>${escapeHtml(label)}</th><td>${escapeHtml(value)}</td></tr>`).join("")}
         </tbody>
       </table>
     </section>
@@ -1285,7 +1285,7 @@ function articleFormTemplate() {
       </div>
       <div class="field">
         <label>Warnbestand</label>
-        <input name="warningStock" type="number" min="0" step="1" value="${state.settings.defaultWarningStock}" required />
+        <input name="warningStock" type="number" min="0" step="1" value="${escapeHtml(state.settings.defaultWarningStock)}" required />
       </div>
       <div class="field wide">
         <label>Kategorie</label>
@@ -1309,15 +1309,15 @@ function articleEditTemplate(article, index) {
       </div>
       <div class="field">
         <label>Preis</label>
-        <input name="price" type="number" min="0" step="0.01" value="${article.price}" required />
+        <input name="price" type="number" min="0" step="0.01" value="${escapeHtml(article.price)}" required />
       </div>
       <div class="field">
         <label>Bestand</label>
-        <input name="stock" type="number" min="0" step="1" value="${article.stock}" required />
+        <input name="stock" type="number" min="0" step="1" value="${escapeHtml(article.stock)}" required />
       </div>
       <div class="field">
         <label>Warnung</label>
-        <input name="warningStock" type="number" min="0" step="1" value="${article.warningStock}" required />
+        <input name="warningStock" type="number" min="0" step="1" value="${escapeHtml(article.warningStock)}" required />
       </div>
       <div class="field">
         <label>Kategorie</label>
@@ -1541,7 +1541,10 @@ function renderCart() {
 
 function updateArticleButtonState(articleId) {
   const article = state.articles.find((item) => item.id === articleId);
-  const button = document.querySelector(`[data-add-article="${articleId}"]`);
+  // CSS.escape, damit eine Artikel-ID mit Anfuehrungszeichen den Selektor
+  // nicht zerlegt (IDs stammen zwar aus uid(), aber auch aus geladenen
+  // Festdateien).
+  const button = document.querySelector(`[data-add-article="${CSS.escape(String(articleId ?? ""))}"]`);
   if (!article || !button) return;
 
   const reserved = cart.find((item) => item.articleId === articleId)?.quantity || 0;

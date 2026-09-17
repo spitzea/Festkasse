@@ -887,9 +887,11 @@ function readPackageMeta() {
 function repositoryUrl(packageMeta) {
   const rawRepository = packageMeta.repository;
   const url = typeof rawRepository === "string" ? rawRepository : rawRepository?.url;
-  return String(url || "")
+  const cleaned = String(url || "")
     .replace(/^git\+/, "")
     .replace(/\.git$/, "");
+  // Nur https zulassen - der Wert landet in den Systeminformationen.
+  return /^https:\/\/[^\s"'<>]+$/.test(cleaned) ? cleaned : "";
 }
 
 function readGitCommit() {
@@ -984,10 +986,28 @@ function fetchJson(url, timeoutMs = 3000) {
   });
 }
 
+// Die Versionsnummer kommt aus einer fremden package.json ueber das Netz und
+// wird in der Oberflaeche angezeigt - deshalb hier auf ein Zahlenmuster
+// festnageln, statt beliebigen Text durchzureichen.
+function safeVersionText(value) {
+  const version = String(value || "").trim();
+  return /^[0-9]+(\.[0-9]+){0,3}(-[0-9A-Za-z.]+)?$/.test(version) ? version : "unknown";
+}
+
 async function checkLatestVersion() {
   const currentVersion = readPackageVersion();
   const latestPackage = await fetchJson(latestVersionUrl);
-  const latestVersion = latestPackage.version || "unknown";
+  const latestVersion = safeVersionText(latestPackage.version);
+  if (latestVersion === "unknown") {
+    return {
+      ok: false,
+      currentVersion,
+      latestVersion,
+      isLatest: null,
+      updateAvailable: false,
+      error: "Die gemeldete Version ist keine gültige Versionsnummer."
+    };
+  }
   const comparison = compareVersions(currentVersion, latestVersion);
   return {
     ok: true,
