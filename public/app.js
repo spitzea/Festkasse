@@ -1702,21 +1702,24 @@ function bindAdmin() {
   });
 
   const createForm = document.querySelector("[data-article-form]");
-  createForm?.addEventListener("submit", (event) => {
+  createForm?.addEventListener("submit", async (event) => {
     event.preventDefault();
-    const form = new FormData(event.currentTarget);
+    const result = readArticleForm(event.currentTarget);
+    if (result.error) {
+      markArticleFieldError(event.currentTarget, result.field, `Neuer Artikel: ${result.error}`);
+      return;
+    }
     state.articles.push({
+      ...result.values,
       id: uid("art"),
-      name: String(form.get("name")).trim(),
-      price: Number(form.get("price")),
-      stock: Number(form.get("stock")),
-      warningStock: Number(form.get("warningStock")),
-      category: String(form.get("category")).trim() || "Sonstiges",
-      categoryColor: getCategoryColor(String(form.get("category")).trim() || "Sonstiges"),
       sortOrder: nextArticleSortOrder(),
       active: true
     });
-    saveState();
+    if (!(await saveState())) {
+      state.articles.pop();
+      renderAdmin();
+      return;
+    }
     clearAdminDirty("articles");
     showToast("Artikel angelegt.");
     renderAdmin();
@@ -2119,20 +2122,77 @@ async function saveCategories() {
   renderAdmin();
 }
 
+const ARTICLE_FIELD_LABELS = {
+  name: "Name",
+  price: "Preis",
+  stock: "Bestand",
+  warningStock: "Warnung"
+};
+
+// Liest ein Artikelformular und prueft jeden Wert einzeln. Der Browser tut das
+// hier nicht von selbst: Der Speichern-Knopf steht ausserhalb der einzelnen
+// Formulare, deshalb greifen required und min beim Klick nicht. Ein leeres
+// Preisfeld wurde so zu Number("") === 0 - der Artikel verkaufte sich
+// stillschweigend fuer 0,00 Euro, und an der Kasse liest niemand die
+// Artikelliste gegen.
+function readArticleForm(formElement) {
+  const form = new FormData(formElement);
+  const name = String(form.get("name") ?? "").trim();
+  if (!name) return { field: "name", error: "Name darf nicht leer sein." };
+
+  const numbers = {};
+  for (const field of ["price", "stock", "warningStock"]) {
+    const raw = String(form.get(field) ?? "").trim().replace(",", ".");
+    const value = Number(raw);
+    if (!raw || !Number.isFinite(value) || value < 0) {
+      return { field, error: `${ARTICLE_FIELD_LABELS[field]} braucht eine Zahl ab 0.` };
+    }
+    if (field !== "price" && !Number.isInteger(value)) {
+      return { field, error: `${ARTICLE_FIELD_LABELS[field]} braucht eine ganze Zahl.` };
+    }
+    numbers[field] = field === "price" ? Math.round(value * 100) / 100 : value;
+  }
+
+  const category = String(form.get("category") ?? "").trim() || "Sonstiges";
+  return {
+    values: {
+      name,
+      ...numbers,
+      category,
+      categoryColor: getCategoryColor(category),
+      active: form.get("active") === "true"
+    }
+  };
+}
+
+function markArticleFieldError(formElement, field, message) {
+  const input = formElement.querySelector(`[name="${field}"]`);
+  if (!input) return;
+  input.classList.add("field-error");
+  input.focus();
+  input.addEventListener("input", () => input.classList.remove("field-error"), { once: true });
+  showToast(message, "error");
+}
+
 async function saveArticles() {
+  // Erst alles pruefen, dann alles uebernehmen: sonst stuenden nach einem
+  // Tippfehler im letzten Formular die vorherigen Artikel bereits geaendert da,
+  // ohne gespeichert zu sein.
+  document.querySelectorAll(".field-error").forEach((input) => input.classList.remove("field-error"));
+  const updates = [];
+  for (const formElement of document.querySelectorAll("[data-edit-article]")) {
+    const article = state.articles.find((item) => item.id === formElement.dataset.editArticle);
+    if (!article) continue;
+    const result = readArticleForm(formElement);
+    if (result.error) {
+      markArticleFieldError(formElement, result.field, `${article.name || "Artikel"}: ${result.error}`);
+      return;
+    }
+    updates.push({ article, values: result.values });
+  }
+
   const finishButton = setButtonState(getAdminSaveButton("articles"), "Speichern...");
-  document.querySelectorAll("[data-edit-article]").forEach((formElement) => {
-      const form = new FormData(formElement);
-      const article = state.articles.find((item) => item.id === formElement.dataset.editArticle);
-      if (!article) return;
-      article.name = String(form.get("name")).trim();
-      article.price = Number(form.get("price"));
-      article.stock = Number(form.get("stock"));
-      article.warningStock = Number(form.get("warningStock"));
-      article.category = String(form.get("category")).trim() || "Sonstiges";
-      article.categoryColor = getCategoryColor(article.category);
-      article.active = form.get("active") === "true";
-    });
+  updates.forEach(({ article, values }) => Object.assign(article, values));
   if (!(await saveState())) {
     finishButton();
     return;

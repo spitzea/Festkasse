@@ -864,6 +864,13 @@ textarea:focus-visible {
   resize: vertical;
 }
 
+/* Beanstandetes Eingabefeld: Die Meldung im Toast nennt den Artikel, die
+   Umrandung zeigt, welches Feld gemeint ist. */
+.field input.field-error {
+  border-color: var(--danger);
+  outline: 2px solid color-mix(in srgb, var(--danger) 45%, transparent);
+}
+
 .field input[type="color"] {
   padding: 0.25rem;
 }

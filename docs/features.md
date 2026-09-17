@@ -17,7 +17,8 @@
 ## Verwaltung
 
 - Anlegen, Bearbeiten, Sortieren und Deaktivieren von Artikeln
-- Verwaltung von Preis, Bestand, Warnbestand und Kategorie
+- Verwaltung von Preis, Bestand, Warnbestand und Kategorie mit Prüfung der
+  Eingaben vor dem Speichern
 - Bis zu sechs frei benennbare und farblich konfigurierbare Kategorien
 - Änderung der Benutzerpasswörter
 - Konfiguration von Festname, Organisation und Logo
