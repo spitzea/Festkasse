@@ -1355,12 +1355,20 @@ textarea:focus-visible {
   font-weight: 950;
 }
 
+/* Feste Spaltenbreiten, damit die Zahlen untereinander stehen. Sie muessen
+   breit genug fuer die laengste Ueberschrift ("Bestand") und den groessten
+   Betrag sein, sonst laufen die Zellen ineinander. */
 .report-table th:nth-child(2),
-.report-table td:nth-child(2),
+.report-table td:nth-child(2) {
+  text-align: right;
+  width: 4.9rem;
+  white-space: nowrap;
+}
+
 .report-table th:nth-child(3),
 .report-table td:nth-child(3) {
   text-align: right;
-  width: 4.5rem;
+  width: 5.6rem;
   white-space: nowrap;
 }
 
@@ -1638,10 +1646,13 @@ textarea:focus-visible {
   }
 
   .report-table th:nth-child(2),
-  .report-table td:nth-child(2),
+  .report-table td:nth-child(2) {
+    width: 4.4rem;
+  }
+
   .report-table th:nth-child(3),
   .report-table td:nth-child(3) {
-    width: 3.8rem;
+    width: 5.1rem;
   }
 }
 

@@ -1014,11 +1014,15 @@ function dayReportHistoryTemplate() {
 
 function archivedReportTablesTemplate(report) {
   const data = buildReportData(report.orders);
+  // Der Bestand stammt aus dem Moment des Abschlusses, danach wird er
+  // zurueckgesetzt. Abschluesse aelterer Versionen haben ihn nicht
+  // gespeichert, dort bleibt die Spalte leer.
+  const consumptionRowsWithStock = attachStock(data.consumptionRows, report.stockByArticleId);
   return `
     <div class="report-grid compact-report-grid">
-      ${reportTableTemplate("1. Normal", data.normalRows, true, data.normalCount, data.normalSum, state.settings.currency)}
-      ${reportTableTemplate("2. Kostenlos", data.freeRows, false, data.freeCount, 0, state.settings.currency)}
-      ${reportTableTemplate("3. Summe", data.consumptionRows, false, data.consumptionCount, 0, state.settings.currency)}
+      ${reportTableTemplate("1. Summe", consumptionRowsWithStock, false, data.consumptionCount, 0, state.settings.currency, true)}
+      ${reportTableTemplate("2. Normal", data.normalRows, true, data.normalCount, data.normalSum, state.settings.currency)}
+      ${reportTableTemplate("3. Kostenlos", data.freeRows, false, data.freeCount, 0, state.settings.currency)}
     </div>
   `;
 }
@@ -2529,10 +2533,12 @@ function printArchivedReport(reportId) {
 
 function printReportFromOrders(report) {
   const data = buildReportData(report.orders);
+  // Gleiche Reihenfolge wie auf dem Bildschirm: erst die Summe, dann die
+  // Aufteilung in bezahlt und kostenlos.
   const sections = [
-    { title: "1. Normal", rows: data.normalRows, showSum: true, totalCount: data.normalCount, totalSum: data.normalSum },
-    { title: "2. Kostenlos", rows: data.freeRows, showSum: false, totalCount: data.freeCount, totalSum: 0 },
-    { title: "3. Summe", rows: data.consumptionRows, showSum: false, totalCount: data.consumptionCount, totalSum: 0 }
+    { title: "1. Summe", rows: data.consumptionRows, showSum: false, totalCount: data.consumptionCount, totalSum: 0 },
+    { title: "2. Normal", rows: data.normalRows, showSum: true, totalCount: data.normalCount, totalSum: data.normalSum },
+    { title: "3. Kostenlos", rows: data.freeRows, showSum: false, totalCount: data.freeCount, totalSum: 0 }
   ];
 
   if (state.settings.printerMode === "textfile" || state.settings.printerMode === "serial") {
@@ -2634,7 +2640,11 @@ function resetDayCash() {
     clubName: state.settings.clubName,
     total,
     orderCount: orders.length,
-    orders: cloneData(orders)
+    orders: cloneData(orders),
+    // Der Bestand wird gleich zurueckgesetzt. Ohne diese Momentaufnahme
+    // liesse sich im Abschluss spaeter nicht mehr nachsehen, was am Ende des
+    // Tages noch da war.
+    stockByArticleId: Object.fromEntries(state.articles.map((article) => [article.id, article.stock]))
   });
 
   const orderIds = new Set(orders.map((order) => order.id));
