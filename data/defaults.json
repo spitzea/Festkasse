@@ -15,6 +15,14 @@
       "active": true,
       "passwordSalt": "default-admin",
       "passwordHash": "48451a874317ae58ad068ea737fd3fbb1a9689958087047794809a74bbc5ff79"
+    },
+    {
+      "id": "usr_report",
+      "username": "report",
+      "role": "report",
+      "active": true,
+      "passwordSalt": "default-report",
+      "passwordHash": "cf78e4eb0a451bce72cf54d743bfdc3e58cf40afb2ea63de5804710ae8ba3325"
     }
   ],
   "articles": [

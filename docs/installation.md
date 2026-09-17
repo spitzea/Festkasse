@@ -59,9 +59,10 @@ npm start
 | --- | --- | --- |
 | Kassenbenutzer | `kasse` | `kasse123` |
 | Administrator | `admin` | `admin123` |
+| Bericht (nur lesend) | `report` | `report123` |
 
 Die Standardpasswörter sind ausschließlich für die Ersteinrichtung vorgesehen.
-Ändern Sie beide Passwörter vor dem produktiven Einsatz unter
+Ändern Sie alle drei Passwörter vor dem produktiven Einsatz unter
 **Admin > Benutzer & Passwörter**.
 
 Passwörter werden serverseitig ausschließlich als gesalzene Hashwerte

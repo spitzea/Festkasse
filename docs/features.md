@@ -2,7 +2,8 @@
 
 ## Kassenbetrieb
 
-- Anmeldung mit getrennten Rollen für Kassenbenutzer und Administratoren
+- Anmeldung mit getrennten Rollen für Kassenbenutzer, Administratoren und eine
+  nur lesende Berichts-Rolle
 - Touchoptimierte Kassenansicht mit großen Artikelkarten
 - Gruppierung der Artikel nach farbigen Kategorien
 - Warenkorb mit Erhöhen, Reduzieren und Löschen einzelner Positionen
@@ -26,6 +27,9 @@
 - Gesamtumsatz und Anzahl ausgegebener Artikel
 - Tageskassenabschluss mit historischem Tagesabschluss
 - Erneutes Anzeigen und Drucken abgeschlossener Tageskassen
+- Eigene, nur lesende Live-Auswertungsseite (`/report`) für die Berichts-Rolle,
+  unabhängig und parallel zur Kassensitzung nutzbar (kein Konflikt mit der
+  Ein-Sitzung-Sperre der Kasse)
 
 ## Drucken
 

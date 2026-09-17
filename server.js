@@ -7,7 +7,9 @@ const fsp = require("fs/promises");
 const path = require("path");
 const crypto = require("crypto");
 const https = require("https");
+const os = require("os");
 const { execFile, execFileSync } = require("child_process");
+const { filterPaidOrdersForDate, buildReportData, buildIntervalBuckets } = require("./public/report-shared.js");
 
 const port = process.env.PORT || 3000;
 const publicDir = path.join(__dirname, "public");
@@ -49,6 +51,14 @@ const defaultState = {
       active: true,
       passwordSalt: "default-admin",
       passwordHash: "48451a874317ae58ad068ea737fd3fbb1a9689958087047794809a74bbc5ff79"
+    },
+    {
+      id: "usr_report",
+      username: "report",
+      role: "report",
+      active: true,
+      passwordSalt: "default-report",
+      passwordHash: "cf78e4eb0a451bce72cf54d743bfdc3e58cf40afb2ea63de5804710ae8ba3325"
     }
   ],
   articles: [
@@ -109,15 +119,50 @@ async function ensureDataFiles() {
   }
 }
 
+// Bestehende Installationen (data/*.json existiert schon vor diesem Update)
+// bekommen den neuen "report"-Nutzer sonst nie, weil defaultState nur beim
+// allerersten Start greift. Ergänzt ihn, falls er in einer Datei fehlt.
+function addReportUserIfMissing(state) {
+  const users = state.users || [];
+  if (users.some((user) => user.username === "report")) return null;
+  return {
+    ...state,
+    users: [...users, {
+      id: "usr_report",
+      username: "report",
+      role: "report",
+      active: true,
+      passwordSalt: "default-report",
+      passwordHash: "cf78e4eb0a451bce72cf54d743bfdc3e58cf40afb2ea63de5804710ae8ba3325"
+    }]
+  };
+}
+
 async function migrateLegacyDataFiles() {
   if (!fs.existsSync(activePath) && fs.existsSync(legacyActivePath)) {
     await fsp.copyFile(legacyActivePath, activePath);
   }
   if (fs.existsSync(activePath)) {
-    const active = await readJson(activePath);
+    let active = await readJson(activePath);
+    let changed = false;
     if (active.settings?.activeEventFile !== "active-event.json") {
-      active.settings = { ...(active.settings || {}), activeEventFile: "active-event.json" };
+      active = { ...active, settings: { ...(active.settings || {}), activeEventFile: "active-event.json" } };
+      changed = true;
+    }
+    const withReportUser = addReportUserIfMissing(active);
+    if (withReportUser) {
+      active = withReportUser;
+      changed = true;
+    }
+    if (changed) {
       await writeJson(activePath, active);
+    }
+  }
+  if (fs.existsSync(defaultsPath)) {
+    const defaults = await readJson(defaultsPath);
+    const withReportUser = addReportUserIfMissing(defaults);
+    if (withReportUser) {
+      await writeJson(defaultsPath, withReportUser);
     }
   }
 
@@ -161,6 +206,10 @@ function hasDefaultPassword(user) {
     admin: {
       passwordSalt: "default-admin",
       passwordHash: "48451a874317ae58ad068ea737fd3fbb1a9689958087047794809a74bbc5ff79"
+    },
+    report: {
+      passwordSalt: "default-report",
+      passwordHash: "cf78e4eb0a451bce72cf54d743bfdc3e58cf40afb2ea63de5804710ae8ba3325"
     }
   };
   const expected = defaults[user?.username];
@@ -169,6 +218,13 @@ function hasDefaultPassword(user) {
 
 function hasAnyDefaultPassword(state) {
   return (state.users || []).some(hasDefaultPassword);
+}
+
+// Liefert genau die Benutzernamen, die noch das Standardpasswort haben -
+// die "Standardzugänge"-Box im Login soll pro Zeile verschwinden, sobald
+// dieser eine Nutzer geändert wurde, statt komplett anzuzeigen/auszublenden.
+function defaultPasswordUsernames(state) {
+  return (state.users || []).filter(hasDefaultPassword).map((user) => user.username);
 }
 
 function mergeIncomingState(current, incoming) {
@@ -216,12 +272,19 @@ function verifyPassword(user, password) {
 
 const SESSION_TTL_MS = 12 * 60 * 60 * 1000;
 
-// Nur eine aktive Session gleichzeitig, strikt (auch der gleiche Benutzer wird abgewiesen,
-// solange die Session noch läuft) - verhindert gleichzeitige Schreibzugriffe auf den State
-// von mehreren Kassen. Rein im Arbeitsspeicher: ein Absturz/Neustart des Prozesses
-// (z. B. nach Pi-Reboot) löscht den Lock automatisch, ohne dass etwas aufgeräumt werden muss.
+// Nur eine aktive Kassen/Admin-Sitzung gleichzeitig, strikt (auch der gleiche
+// Benutzer wird abgewiesen, solange die Session noch läuft) - verhindert
+// gleichzeitige Schreibzugriffe auf den State von mehreren Kassen. Rein im
+// Arbeitsspeicher: ein Absturz/Neustart des Prozesses (z. B. nach Pi-Reboot)
+// löscht den Lock automatisch, ohne dass etwas aufgeräumt werden muss.
+//
+// Die rein lesende Rolle "report" ist davon bewusst ausgenommen: sie kann
+// nichts schreiben und daher auch keine Race Condition auslösen, also darf
+// sie beliebig oft parallel zur Kasse laufen (eigener, nicht-exklusiver
+// Session-Speicher statt des exklusiven Locks).
 let activeSession = null;
 let takenOverToken = null;
+const reportSessions = new Map();
 
 function isSessionActive() {
   if (!activeSession) return false;
@@ -233,24 +296,45 @@ function isSessionActive() {
 }
 
 function createSession(user) {
+  const token = crypto.randomBytes(32).toString("hex");
+  const session = { token, id: user.id, username: user.username, role: user.role, expiresAt: Date.now() + SESSION_TTL_MS };
+  if (user.role === "report") {
+    reportSessions.set(token, session);
+    return token;
+  }
   if (isSessionActive()) {
     takenOverToken = activeSession.token;
   }
-  const token = crypto.randomBytes(32).toString("hex");
-  activeSession = { token, id: user.id, username: user.username, role: user.role, expiresAt: Date.now() + SESSION_TTL_MS };
+  activeSession = session;
   return token;
 }
 
+function getReportSession(token) {
+  const session = reportSessions.get(token);
+  if (!session) return null;
+  if (session.expiresAt < Date.now()) {
+    reportSessions.delete(token);
+    return null;
+  }
+  session.expiresAt = Date.now() + SESSION_TTL_MS;
+  return session;
+}
+
 function getSession(token) {
-  if (!token || !isSessionActive() || activeSession.token !== token) return null;
-  activeSession.expiresAt = Date.now() + SESSION_TTL_MS;
-  return activeSession;
+  if (!token) return null;
+  if (isSessionActive() && activeSession.token === token) {
+    activeSession.expiresAt = Date.now() + SESSION_TTL_MS;
+    return activeSession;
+  }
+  return getReportSession(token);
 }
 
 function destroySession(token) {
   if (activeSession && activeSession.token === token) {
     activeSession = null;
+    return;
   }
+  reportSessions.delete(token);
 }
 
 function sessionTokenFromRequest(req) {
@@ -277,6 +361,17 @@ function requireAdminSession(req, res) {
   if (!session) return null;
   if (session.role !== "admin") {
     sendJson(res, 403, { error: "Nur für Administratoren." });
+    return null;
+  }
+  return session;
+}
+
+// Fuer schreibende/aktive Endpunkte, die "report" (rein lesend) nicht nutzen darf.
+function requireWriteSession(req, res) {
+  const session = requireSession(req, res);
+  if (!session) return null;
+  if (session.role === "report") {
+    sendJson(res, 403, { error: "Nur lesender Zugriff." });
     return null;
   }
   return session;
@@ -748,6 +843,21 @@ function readGitCommit() {
   }
 }
 
+// Ermittelt die LAN-IP frisch bei jeder Anfrage (nicht beim Start gecacht),
+// damit ein IP-Wechsel zwischen Festen (anderes Netz, neue DHCP-Vergabe)
+// automatisch berücksichtigt wird, ohne den Server neu zu starten.
+function detectLanUrl() {
+  const interfaces = os.networkInterfaces();
+  for (const name of Object.keys(interfaces)) {
+    for (const iface of interfaces[name] || []) {
+      if (iface.family === "IPv4" && !iface.internal) {
+        return { ip: iface.address, port, url: `http://${iface.address}:${port}/` };
+      }
+    }
+  }
+  return { ip: null, port, url: null };
+}
+
 function systemInfo(state = {}) {
   const packageMeta = readPackageMeta();
   return {
@@ -761,7 +871,8 @@ function systemInfo(state = {}) {
     copyright: "Copyright (c) Andreas Spitzenberg",
     repositoryUrl: repositoryUrl(packageMeta),
     serverTime: new Date().toISOString(),
-    defaultPasswordsActive: hasAnyDefaultPassword(state)
+    defaultPasswordsActive: hasAnyDefaultPassword(state),
+    defaultPasswordUsernames: defaultPasswordUsernames(state)
   };
 }
 
@@ -883,13 +994,37 @@ async function handleApi(req, res, urlPath) {
   }
 
   if (req.method === "POST" && urlPath === "/api/state") {
-    if (!requireSession(req, res)) return;
+    if (!requireWriteSession(req, res)) return;
     const body = await readBody(req);
     const current = await readJson(activePath);
     const nextState = mergeIncomingState(current, body.state || {});
     nextState.settings = { ...(nextState.settings || {}), updatedAt: new Date().toISOString() };
     await writeJson(activePath, nextState);
     sendJson(res, 200, { state: sanitizeState(nextState), system: systemInfo(nextState) });
+    return;
+  }
+
+  if (req.method === "GET" && urlPath === "/api/report/today") {
+    const session = requireSession(req, res);
+    if (!session) return;
+    const state = await readJson(activePath);
+    const today = new Date().toISOString().slice(0, 10);
+    const orders = filterPaidOrdersForDate(state.orders || [], today);
+    // Trace: Zugriffe auf den Live-Bericht sind schwer zu reproduzieren
+    // (separates Geraet/Tab, eigene Session), daher hier sichtbar im
+    // Server-Terminal protokollieren, wer wann abgerufen hat.
+    console.log(
+      `[Festkasse] Report-Abruf: "${session.username}" (Rolle ${session.role}) fuer ${today} | ${new Date().toISOString()}`
+    );
+    sendJson(res, 200, {
+      eventName: state.settings?.eventName || "",
+      clubName: state.settings?.clubName || "",
+      logoDataUrl: state.settings?.logoDataUrl || "",
+      currency: state.settings?.currency || "EUR",
+      report: buildReportData(orders),
+      buckets: buildIntervalBuckets(orders),
+      articleStock: Object.fromEntries((state.articles || []).map((article) => [article.id, article.stock]))
+    });
     return;
   }
 
@@ -901,7 +1036,14 @@ async function handleApi(req, res, urlPath) {
       sendJson(res, 401, { error: "Login fehlgeschlagen." });
       return;
     }
-    if (isSessionActive() && !body.force) {
+    if (user.role !== "report" && isSessionActive() && !body.force) {
+      // Diagnose: haelt fest, WER (Rolle/Geraet) hier abgewiesen wurde und
+      // wer gerade als aktiv gilt - sichtbar direkt im Server-Terminal.
+      console.warn(
+        `[Festkasse] Login-Konflikt (409): "${body.username}" (Rolle ${user.role}) abgewiesen, ` +
+        `"${activeSession.username}" (Rolle ${activeSession.role}) ist aktiv. ` +
+        `User-Agent: ${req.headers["user-agent"] || "unbekannt"} | ${new Date().toISOString()}`
+      );
       sendJson(res, 409, { error: `Bereits angemeldet: ${activeSession.username}`, activeUsername: activeSession.username });
       return;
     }
@@ -1016,7 +1158,7 @@ async function handleApi(req, res, urlPath) {
   }
 
   if (req.method === "POST" && urlPath === "/api/print/receipts") {
-    if (!requireSession(req, res)) return;
+    if (!requireWriteSession(req, res)) return;
     const body = await readBody(req);
     const state = await readJson(activePath);
     const settings = { ...(state.settings || {}), ...(body.settings || {}) };
@@ -1127,13 +1269,24 @@ async function handleApi(req, res, urlPath) {
     return;
   }
 
+  if (req.method === "GET" && urlPath === "/api/system/network") {
+    if (!requireAdminSession(req, res)) return;
+    sendJson(res, 200, detectLanUrl());
+    return;
+  }
+
   sendJson(res, 404, { error: "API-Endpunkt nicht gefunden." });
 }
 
 function serveStatic(req, res) {
   const urlPath = decodeURIComponent(req.url.split("?")[0]);
-  const safePath = path.normalize(urlPath).replace(/^(\.\.[/\\])+/, "");
-  const requestedPath = safePath === "/" ? "/index.html" : safePath;
+  // URL-Pfade sind immer POSIX-Forward-Slash, unabhängig vom Server-Betriebssystem.
+  // path.normalize() (ohne .posix) würde auf Windows "/" in "\" umwandeln und
+  // damit sowohl den Alias-Vergleich als auch die "/"-Sonderbehandlung stumm
+  // brechen - deshalb hier ausdrücklich path.posix.normalize verwenden.
+  const safePath = path.posix.normalize(urlPath).replace(/^(\.\.\/)+/, "");
+  const aliases = { "/": "/index.html", "/report": "/report.html" };
+  const requestedPath = aliases[safePath] || safePath;
   const filePath = path.join(publicDir, requestedPath);
 
   if (!filePath.startsWith(publicDir)) {

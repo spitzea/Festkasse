@@ -46,6 +46,30 @@ let cart = [];
 let paidAmount = "";
 let toastTimer = null;
 let clockTimer = null;
+
+// Persistenter Trace fuer View-Wechsel: console.warn allein reicht nicht, weil
+// Chrome/Chromium Konsolenausgaben von VOR dem Oeffnen der DevTools nicht
+// nachliefert. In sessionStorage geschrieben, damit man ihn auch nach dem
+// Auftreten des Sprungs noch auslesen kann (window.festkasseViewTrace()).
+const VIEW_TRACE_KEY = "festkasse-view-trace";
+
+function logViewTransition(to, meta = {}) {
+  try {
+    const entries = JSON.parse(window.sessionStorage.getItem(VIEW_TRACE_KEY) || "[]");
+    entries.push({
+      time: new Date().toISOString(),
+      from: activeView,
+      to,
+      fromAdminSection: activeAdminSection,
+      ...meta
+    });
+    window.sessionStorage.setItem(VIEW_TRACE_KEY, JSON.stringify(entries.slice(-20)));
+  } catch (error) {
+    // sessionStorage evtl. voll/deaktiviert - Trace ist dann halt weg, kein harter Fehler
+  }
+}
+
+window.festkasseViewTrace = () => JSON.parse(window.sessionStorage.getItem(VIEW_TRACE_KEY) || "[]");
 const adminDirtySections = new Set();
 const adminSavedSections = new Set();
 let eventCatalog = null;
@@ -61,7 +85,8 @@ let systemInfo = {
   copyright: "",
   repositoryUrl: "",
   serverTime: "",
-  defaultPasswordsActive: false
+  defaultPasswordsActive: false,
+  defaultPasswordUsernames: []
 };
 let versionCheck = { status: "unchecked", label: "nicht geprüft" };
 let lastCheckout = null;
@@ -69,6 +94,8 @@ let undoCheckoutTimer = null;
 let systemInfoRefreshPending = false;
 let versionCheckStarted = false;
 let printerStatus = { online: false, label: "Drucker Offline", mode: "browser" };
+let systemNetwork = null;
+let systemNetworkPending = false;
 let printerStatusTimer = null;
 let themeMode = normalizeThemeMode(window.localStorage.getItem(THEME_STORAGE_KEY));
 
@@ -88,20 +115,13 @@ function setThemeMode(mode) {
 }
 
 applyTheme(themeMode);
-
-function escapeHtml(value) {
-  return String(value ?? "").replace(/[&<>"']/g, (char) => (
-    { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[char]
-  ));
-}
+// escapeHtml, moneyText, filterPaidOrdersForDate, totalsByMode, buildReportData
+// und buildIntervalBuckets kommen aus report-shared.js (vor app.js eingebunden).
 
 function safeColor(value) {
   return /^#[0-9a-f]{3,8}$/i.test(String(value || "")) ? value : "#999999";
 }
-
-function safeLogoSrc(value) {
-  return /^data:image\//i.test(String(value || "")) ? escapeHtml(value) : "";
-}
+// safeLogoSrc kommt aus report-shared.js.
 
 async function apiFetch(input, init = {}) {
   if (!sessionToken) return fetch(input, init);
@@ -129,6 +149,10 @@ function handleSessionInvalidated(message) {
   cart = [];
   paidAmount = "";
   loginNotice = message;
+  // Sonst pollen Drucker-Status/Uhr nach dem Abmelden ungebremst weiter und
+  // spammen mit jedem 10-Sekunden-Takt einen weiteren 401 in die Konsole.
+  clearInterval(printerStatusTimer);
+  clearInterval(clockTimer);
   render();
 }
 
@@ -151,6 +175,16 @@ async function refreshSystemInfo() {
   }
 }
 
+async function refreshSystemNetwork() {
+  try {
+    const response = await apiFetch(`/api/system/network?t=${Date.now()}`, { cache: "no-store" });
+    if (!response.ok) return;
+    systemNetwork = await response.json();
+  } catch (error) {
+    // Netzwerk-Info ist rein informativ, kein harter Fehler noetig.
+  }
+}
+
 function needsSystemInfoRefresh() {
   return ["appVersion", "gitCommit", "nodeVersion", "platform"].some((key) => !hasUsefulSystemValue(systemInfo[key]));
 }
@@ -167,7 +201,7 @@ function normalizeState(data) {
   const normalized = { ...cloneData(seedData), ...data };
   normalized.settings = { ...seedData.settings, ...(normalized.settings || {}) };
   normalized.settings.categories = normalizeCategories(normalized.settings.categories, normalized.articles || []);
-  normalized.users = (normalized.users || []).filter((user) => user.role === "user" || user.role === "admin");
+  normalized.users = (normalized.users || []).filter((user) => ["user", "admin", "report"].includes(user.role));
   normalized.articles = (normalized.articles || []).map((article) => ({
     ...article,
     category: article.category || "Sonstiges",
@@ -243,10 +277,7 @@ function syncArticleCategoryColors(categoryName, color) {
 }
 
 function money(value) {
-  if ((state.settings.currency || "EUR") === "EUR") {
-    return `${new Intl.NumberFormat("de-DE", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(value || 0)} €`;
-  }
-  return new Intl.NumberFormat("de-DE", { style: "currency", currency: state.settings.currency }).format(value || 0);
+  return moneyText(value, state.settings.currency || "EUR");
 }
 
 function moneyInput(value) {
@@ -281,7 +312,9 @@ function cashierDateTime(date = new Date()) {
 }
 
 function roleLabel(role) {
-  return role === "admin" ? "Admin" : "User";
+  if (role === "admin") return "Admin";
+  if (role === "report") return "Bericht (nur lesend)";
+  return "User";
 }
 
 function systemVersionLabel() {
@@ -311,25 +344,9 @@ function uid(prefix) {
 }
 
 function todayOrders() {
-  const today = new Date().toISOString().slice(0, 10);
-  return state.orders.filter((order) => order.createdAt.slice(0, 10) === today && order.status === "paid");
+  return filterPaidOrdersForDate(state.orders, new Date().toISOString().slice(0, 10));
 }
-
-function buildReportData(orders) {
-  const normalRows = totalsByMode(orders, false);
-  const freeRows = totalsByMode(orders, true);
-  const consumptionRows = totalsByMode(orders, null);
-  return {
-    normalRows,
-    freeRows,
-    consumptionRows,
-    normalCount: normalRows.reduce((sum, item) => sum + item.quantity, 0),
-    normalSum: normalRows.reduce((sum, item) => sum + item.sum, 0),
-    freeCount: freeRows.reduce((sum, item) => sum + item.quantity, 0),
-    consumptionCount: consumptionRows.reduce((sum, item) => sum + item.quantity, 0),
-    total: orders.reduce((sum, order) => sum + order.total, 0)
-  };
-}
+// buildReportData kommt aus report-shared.js.
 
 function canManage() {
   return sessionUser && sessionUser.role === "admin";
@@ -349,6 +366,13 @@ function restoreSessionUser() {
     );
     sessionUser = matchingUser || null;
     sessionToken = sessionUser ? storedUser.token || null : null;
+    if (sessionUser) {
+      // Ansicht ueberlebt einen Reload (z.B. wenn der Browser einen im
+      // Hintergrund liegenden Tab automatisch neu laedt) - sonst bleibt man
+      // zwar angemeldet, landet aber wieder auf der Kasse.
+      if (storedUser.activeView) activeView = storedUser.activeView;
+      if (storedUser.activeAdminSection) activeAdminSection = storedUser.activeAdminSection;
+    }
   } catch (error) {
     sessionUser = null;
     sessionToken = null;
@@ -365,7 +389,9 @@ function rememberSessionUser() {
     id: sessionUser.id,
     username: sessionUser.username,
     role: sessionUser.role,
-    token: sessionToken
+    token: sessionToken,
+    activeView,
+    activeAdminSection
   }));
 }
 
@@ -402,6 +428,19 @@ function render() {
   if (activeView === "admin" && (canManage() || activeAdminSection === "info")) {
     renderAdmin();
   } else {
+    if (activeView !== "cashier") {
+      // Diagnose: Sprung zur Kasse ueber den render()-Fallback (nicht ueber
+      // einen Tab-Klick) - haelt fest, woran es lag, um den Ursprung beim
+      // naechsten Mal zu finden. Fuer Admins (canManage() === true) sollte
+      // dieser Zweig nie erreicht werden.
+      logViewTransition("cashier", {
+        reason: "render-fallback",
+        sessionUser: sessionUser ? { username: sessionUser.username, role: sessionUser.role, active: sessionUser.active } : null,
+        canManage: canManage(),
+        userInStateUsers: state.users?.find((user) => user.id === sessionUser?.id) || null
+      });
+      console.warn("[Festkasse] Unerwarteter Sprung zur Kasse ueber render()-Fallback.", window.festkasseViewTrace().at(-1));
+    }
     activeView = "cashier";
     renderCashier();
   }
@@ -429,14 +468,14 @@ function loginTemplate() {
         <form class="login-form" data-login-form>
           <div class="field">
             <label for="username">Benutzer</label>
-            <input id="username" name="username" autocomplete="username" required />
+            <input id="username" name="username" autocomplete="username" autocapitalize="none" autocorrect="off" spellcheck="false" required />
           </div>
           <div class="field">
             <label for="password">Passwort</label>
             <input id="password" name="password" type="password" autocomplete="current-password" required />
           </div>
           <button class="primary-button" type="submit">Einloggen</button>
-          ${systemInfo.defaultPasswordsActive === true ? defaultAccessTemplate() : ""}
+          ${defaultAccessTemplate()}
           <div class="login-contact">
             <strong>Rechner: ${escapeHtml(state.settings.calculatorName || "-")}</strong>
             <span>Telefonnummer: ${escapeHtml(state.settings.calculatorPhone || "-")}</span>
@@ -501,11 +540,19 @@ function toDateTimeLocalValue(isoString) {
 }
 
 function defaultAccessTemplate() {
+  const active = systemInfo.defaultPasswordUsernames || [];
+  const entries = [
+    { username: "kasse", label: "Kasse", password: "kasse123" },
+    { username: "admin", label: "Admin", password: "admin123" },
+    { username: "report", label: "Bericht (nur lesend)", password: "report123" }
+  ].filter((entry) => active.includes(entry.username));
+
+  if (!entries.length) return "";
+
   return `
     <div class="login-access">
       <strong>Standardzugänge</strong>
-      <span>Kasse: <code>kasse</code> / <code>kasse123</code></span>
-      <span>Admin: <code>admin</code> / <code>admin123</code></span>
+      ${entries.map((entry) => `<span>${escapeHtml(entry.label)}: <code>${escapeHtml(entry.username)}</code> / <code>${escapeHtml(entry.password)}</code></span>`).join("")}
       <small>Nach einer Änderung gelten die im Adminbereich gesetzten Passwörter.</small>
     </div>
   `;
@@ -617,7 +664,12 @@ function scheduleUndoCheckoutExpiry() {
   if (!lastCheckout) return;
   undoCheckoutTimer = window.setTimeout(() => {
     lastCheckout = null;
-    renderCart();
+    // renderCart() faellt auf renderCashier() zurueck, wenn das Cart-Panel
+    // fehlt (data-cart-panel nicht im DOM) - genau das passiert hier, wenn man
+    // laengst in einen anderen Screen (z.B. Tagesauswertung) gewechselt hat,
+    // und reisst einen dann unbemerkt zurueck zur Kasse. Deshalb nur rendern,
+    // wenn die Kasse tatsaechlich noch der aktive Screen ist.
+    if (activeView === "cashier") renderCart();
   }, Math.max(0, lastCheckout.expiresAt - Date.now()));
 }
 
@@ -717,6 +769,15 @@ function renderAdmin() {
     refreshSystemInfo().finally(() => {
       systemInfoRefreshPending = false;
       if (activeView === "admin" && activeAdminSection === "info") {
+        renderAdmin();
+      }
+    });
+  }
+  if (activeAdminSection === "settings" && !systemNetwork && !systemNetworkPending) {
+    systemNetworkPending = true;
+    refreshSystemNetwork().finally(() => {
+      systemNetworkPending = false;
+      if (activeView === "admin" && activeAdminSection === "settings") {
         renderAdmin();
       }
     });
@@ -841,13 +902,15 @@ function categoryManagementTemplate() {
 function analysisTemplate() {
   const orders = todayOrders();
   const report = buildReportData(orders);
+  const stockByArticleId = Object.fromEntries(state.articles.map((article) => [article.id, article.stock]));
+  const consumptionRowsWithStock = attachStock(report.consumptionRows, stockByArticleId);
 
   return `
     <section class="panel">
       <div class="panel-header">
         <div>
           <h2>Tagesauswertung</h2>
-          <p>Normal, kostenlos und Summe auf einen Blick.</p>
+          <p>Summe, normal und kostenlos auf einen Blick.</p>
         </div>
         <button class="action-button" data-print-report>Auswertung drucken</button>
         <button class="danger-button" data-reset-day ${orders.length ? "" : "disabled"}>Tageskasse abschließen</button>
@@ -857,10 +920,11 @@ function analysisTemplate() {
         <article class="stat-card"><span>Anzahl Essen</span><strong>${report.consumptionCount}</strong></article>
       </div>
       <div class="report-grid">
-        ${reportTableTemplate("1. Normal", report.normalRows, true, report.normalCount, report.normalSum)}
-        ${reportTableTemplate("2. Kostenlos", report.freeRows, false, report.freeCount, 0)}
-        ${reportTableTemplate("3. Summe", report.consumptionRows, false, report.consumptionCount, 0)}
+        ${reportTableTemplate("1. Summe", consumptionRowsWithStock, false, report.consumptionCount, 0, state.settings.currency, true)}
+        ${reportTableTemplate("2. Normal", report.normalRows, true, report.normalCount, report.normalSum, state.settings.currency)}
+        ${reportTableTemplate("3. Kostenlos", report.freeRows, false, report.freeCount, 0, state.settings.currency)}
       </div>
+      ${intervalChartTemplate(buildIntervalBuckets(orders), state.settings.currency)}
       ${dayReportHistoryTemplate()}
     </section>
   `;
@@ -905,65 +969,13 @@ function archivedReportTablesTemplate(report) {
   const data = buildReportData(report.orders);
   return `
     <div class="report-grid compact-report-grid">
-      ${reportTableTemplate("1. Normal", data.normalRows, true, data.normalCount, data.normalSum)}
-      ${reportTableTemplate("2. Kostenlos", data.freeRows, false, data.freeCount, 0)}
-      ${reportTableTemplate("3. Summe", data.consumptionRows, false, data.consumptionCount, 0)}
+      ${reportTableTemplate("1. Normal", data.normalRows, true, data.normalCount, data.normalSum, state.settings.currency)}
+      ${reportTableTemplate("2. Kostenlos", data.freeRows, false, data.freeCount, 0, state.settings.currency)}
+      ${reportTableTemplate("3. Summe", data.consumptionRows, false, data.consumptionCount, 0, state.settings.currency)}
     </div>
   `;
 }
-
-function totalsByMode(orders, isFree) {
-  const totals = {};
-  orders.forEach((order) => {
-    order.items.forEach((item) => {
-      if (isFree !== null && Boolean(item.isFree) !== isFree) return;
-      totals[item.articleId] ||= { name: item.name, quantity: 0, sum: 0 };
-      totals[item.articleId].quantity += item.quantity;
-      totals[item.articleId].sum += item.lineTotal;
-    });
-  });
-
-  return Object.values(totals).sort((a, b) => a.name.localeCompare(b.name, "de"));
-}
-
-function reportTableTemplate(title, rows, showSum, totalCount, totalSum) {
-  const emptyColumns = showSum ? 3 : 2;
-  const rowsHtml = rows.length
-    ? rows.map((item) => `
-      <tr>
-        <td>${escapeHtml(item.name)}</td>
-        <td>${item.quantity}</td>
-        ${showSum ? `<td>${money(item.sum)}</td>` : ""}
-      </tr>
-    `).join("")
-    : `<tr><td colspan="${emptyColumns}">Noch keine Buchungen.</td></tr>`;
-
-  return `
-    <article class="report-card">
-      <h3>${escapeHtml(title)}</h3>
-      <div class="table-wrap">
-        <table class="report-table">
-          <thead>
-            <tr>
-              <th>Artikel</th>
-              <th>Anzahl</th>
-              ${showSum ? "<th>Summe</th>" : ""}
-            </tr>
-          </thead>
-          <tbody>${rowsHtml}</tbody>
-          <tfoot>
-            <tr>
-              <td>Total Artikel</td>
-              <td>${totalCount}</td>
-              ${showSum ? "<td></td>" : ""}
-            </tr>
-            ${showSum ? `<tr><td>Total Summe</td><td></td><td>${money(totalSum)}</td></tr>` : ""}
-          </tfoot>
-        </table>
-      </div>
-    </article>
-  `;
-}
+// totalsByMode und reportTableTemplate kommen aus report-shared.js.
 
 function settingsTemplate() {
   return `
@@ -1012,7 +1024,46 @@ function settingsTemplate() {
         </div>
       </form>
     </section>
+    ${networkQrTemplate()}
     ${canSetSystemTime() ? systemTimeTemplate() : ""}
+  `;
+}
+
+function networkQrTemplate() {
+  if (!systemNetwork || !systemNetwork.url) {
+    return `
+      <section class="panel">
+        <div class="panel-header">
+          <div>
+            <h2>QR-Code</h2>
+            <p>Login-Seite, z. B. um den Tagesbericht vom Handy aus zu lesen.</p>
+          </div>
+        </div>
+        <p class="hint">Netzwerkadresse konnte nicht ermittelt werden.</p>
+      </section>
+    `;
+  }
+
+  const qr = qrcode(0, "M");
+  qr.addData(systemNetwork.url);
+  qr.make();
+
+  return `
+    <section class="panel">
+      <div class="panel-header">
+        <div>
+          <h2>QR-Code</h2>
+          <p>Login-Seite, z. B. um den Tagesbericht vom Handy aus zu lesen.</p>
+        </div>
+      </div>
+      <div class="qr-row">
+        <div class="qr-code">${qr.createSvgTag({ cellSize: 4, margin: 8, scalable: true })}</div>
+        <div class="qr-info">
+          <span>Adresse</span>
+          <strong>${escapeHtml(systemNetwork.url)}</strong>
+        </div>
+      </div>
+    </section>
   `;
 }
 
@@ -1307,8 +1358,15 @@ function bindLogin() {
     sessionUser = result.user;
     sessionToken = result.token || null;
     sessionInvalidatedHandled = false;
-    rememberSessionUser();
     activeView = "cashier";
+    activeAdminSection = "analysis";
+    rememberSessionUser();
+
+    if (sessionUser.role === "report") {
+      window.location.href = "/report.html";
+      return;
+    }
+
     state = await loadState();
     render();
   });
@@ -1316,8 +1374,14 @@ function bindLogin() {
 
 function bindShell() {
   document.querySelectorAll("[data-view]").forEach((button) => {
-    button.addEventListener("click", () => {
+    button.addEventListener("click", (event) => {
+      logViewTransition(button.dataset.view, {
+        reason: "tab-click",
+        isTrusted: event.isTrusted,
+        buttonLabel: button.textContent.trim()
+      });
       activeView = button.dataset.view;
+      rememberSessionUser();
       render();
     });
   });
@@ -1336,6 +1400,7 @@ function bindShell() {
     button.addEventListener("click", () => {
       activeView = "admin";
       activeAdminSection = button.dataset.adminSection;
+      rememberSessionUser();
       render();
     });
   });
@@ -1350,6 +1415,8 @@ function bindShell() {
     clearSessionUser();
     cart = [];
     paidAmount = "";
+    clearInterval(printerStatusTimer);
+    clearInterval(clockTimer);
     render();
   });
   document.querySelector("[data-system-shutdown]")?.addEventListener("click", shutdownSystem);
@@ -1797,15 +1864,19 @@ async function applyEventResponse(response, message) {
 
 async function setUserPassword(event) {
   event.preventDefault();
+  // event.currentTarget wird vom Browser auf null zurueckgesetzt, sobald das
+  // Dispatch des Events fertig ist - nach einem await (hier zweimal) waere
+  // der Zugriff darauf also ein Absturz. Deshalb frueh in eine Variable holen.
+  const form = event.currentTarget;
   const finishButton = setButtonState(event.submitter, "Speichern...");
-  const form = new FormData(event.currentTarget);
-  const password = String(form.get("password") || "");
+  const formData = new FormData(form);
+  const password = String(formData.get("password") || "");
   if (password.length < 4) {
     finishButton();
     showToast("Passwort bitte mit mindestens 4 Zeichen setzen.");
     return;
   }
-  const username = event.currentTarget.dataset.passwordUser;
+  const username = form.dataset.passwordUser;
   const response = await apiFetch("/api/users/password", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -1818,7 +1889,7 @@ async function setUserPassword(event) {
   }
   const payload = await response.json().catch(() => ({}));
   systemInfo = { ...systemInfo, ...(payload.system || {}) };
-  event.currentTarget.reset();
+  form.reset();
   finishButton("Gespeichert");
   showToast(`Passwort für ${username} gespeichert.`);
   window.setTimeout(() => finishButton(), 1200);
@@ -2511,6 +2582,10 @@ async function init() {
     restoreSessionUser();
   } catch (error) {
     bootError = "Die Festdaten konnten nicht vom Server geladen werden. Bitte die App über npm start / localhost öffnen.";
+  }
+  if (sessionUser?.role === "report") {
+    window.location.href = "/report.html";
+    return;
   }
   render();
 }

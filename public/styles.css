@@ -1944,3 +1944,162 @@ textarea:focus-visible {
     border-bottom: 0;
   }
 }
+
+.interval-chart-group {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(18rem, 1fr));
+  gap: 1.2rem;
+  padding: 0 1.2rem 1.2rem;
+}
+
+.interval-chart {
+  padding: 1rem;
+  border-radius: var(--radius-md);
+  background: var(--panel-strong);
+  border: 1px solid var(--line);
+}
+
+.interval-chart-title {
+  font-weight: 600;
+  margin-bottom: var(--space-sm);
+  color: var(--muted);
+  font-size: 0.92rem;
+}
+
+.interval-bar-row {
+  display: flex;
+  align-items: flex-end;
+  gap: 6px;
+  height: 90px;
+  overflow-x: auto;
+  padding-top: 1.4rem;
+  padding-bottom: 1.3rem;
+}
+
+.interval-bar-slot {
+  flex: 1 1 0;
+  /* Breit genug fuer den laengsten realistischen Wert ("134,00 €"), zentriert
+     ueber dem eigenen Balken - dadurch ragt nichts in den Nachbarn hinein,
+     egal wie viele Balken es sind. */
+  min-width: 56px;
+  max-width: 72px;
+  height: 100%;
+  display: flex;
+  align-items: flex-end;
+  position: relative;
+}
+
+.interval-bar {
+  width: 100%;
+  height: var(--bar-height, 0%);
+  min-height: 2px;
+  background: var(--amber);
+  border-radius: 4px 4px 0 0;
+  position: relative;
+}
+
+.interval-bar-is-peak {
+  background: color-mix(in srgb, var(--amber) 85%, white);
+}
+
+.interval-bar-value {
+  position: absolute;
+  top: -1.2rem;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 0.72rem;
+  color: var(--text);
+  white-space: nowrap;
+}
+
+.interval-bar-tick {
+  position: absolute;
+  bottom: -1.25rem;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 0.68rem;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+/* Im Light Mode reicht der reine Amber-Kontrast gegen die Flaeche nicht (per
+   Validator geprüft) - ein dünner Rand gibt die noetige Abgrenzung. */
+:root[data-theme="light"] .interval-bar {
+  border: 1px solid color-mix(in srgb, var(--amber) 55%, black);
+}
+
+.report-shell {
+  max-width: 640px;
+  margin: 0 auto;
+  padding: var(--space-lg) var(--space-md) var(--space-xl);
+  display: grid;
+  gap: var(--space-lg);
+}
+
+.report-brand {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+}
+
+.report-brand > div {
+  flex: 1;
+  min-width: 0;
+}
+
+.report-brand h1 {
+  margin: 0;
+  font-size: clamp(1.2rem, 4vw, 1.6rem);
+}
+
+.report-brand p {
+  margin: 0;
+  color: var(--muted);
+}
+
+.report-logo {
+  width: 3rem;
+  height: 3rem;
+  border-radius: var(--radius-md);
+  object-fit: cover;
+}
+
+.report-updated {
+  text-align: center;
+  margin: 0;
+  padding: var(--space-sm) 1.2rem 1.2rem;
+}
+
+.qr-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-lg);
+  flex-wrap: wrap;
+  padding: 0 1.2rem 1.2rem;
+}
+
+.qr-code {
+  width: 9rem;
+  height: 9rem;
+  background: #ffffff;
+  border-radius: var(--radius-sm);
+  padding: var(--space-sm);
+  flex: 0 0 auto;
+}
+
+.qr-code svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.qr-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.qr-info span {
+  color: var(--muted);
+  font-size: 0.9rem;
+}
