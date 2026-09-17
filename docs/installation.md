@@ -87,9 +87,27 @@ data/saved/*.json        Gespeicherte Festvorlagen
 data/prints/*.txt        TXT-Testbons und TXT-Auswertungen
 ```
 
-`data/defaults.json` und `data/active-event.json` sind Teil des Repositories.
-Laufzeitdateien aus `data/saved` und `data/prints` werden ignoriert, damit
-lokale Vorlagen und Testbons nicht versehentlich veröffentlicht werden.
+Nur `data/defaults.json` ist Teil des Repositories. Es enthält die neutrale
+Vorlage ohne Vereinsdaten, ohne Logo und ohne Buchungen.
+
+`data/active-event.json` ist der laufende Zustand der Kasse und wird bewusst
+nicht versioniert. Beim ersten Start legt der Server die Datei automatisch aus
+`data/defaults.json` an. Ebenso ignoriert werden `data/saved` und
+`data/prints`, damit lokale Vorlagen, Vereinsdaten und Testbons nicht
+versehentlich veröffentlicht werden.
+
+### Hinweis für bestehende Installationen
+
+Frühere Versionen haben `data/active-event.json` mitversioniert. Nehmen Sie die
+Datei einmalig aus der Versionskontrolle, bevor Sie aktualisieren. Der Inhalt
+auf der Festplatte bleibt dabei erhalten:
+
+```bash
+git rm --cached data/active-event.json
+git commit -m "Laufzeitdaten aus der Versionskontrolle nehmen"
+```
+
+Legen Sie vorher eine Sicherung an, falls die Kasse bereits Buchungen enthält.
 
 ## Weiterführende Anleitungen
 
