@@ -7,6 +7,9 @@ KI-Assistenten.
 Die Festkasse ist ein Hobbyprojekt für Vereine und Feuerwehren. Die Regeln sind
 bewusst knapp gehalten. Was hier steht, gilt aber ausnahmslos.
 
+[AGENTS.md](AGENTS.md) fasst für KI-Assistenten die Punkte zusammen, die in der
+Praxis am häufigsten schiefgehen. Sie ersetzt diese Datei nicht.
+
 ## Grundsätze
 
 - Kein Frontend-Framework, kein Bundler, kein Build-Schritt. Die Dateien unter

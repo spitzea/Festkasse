@@ -1,5 +1,9 @@
 # Hinweise für KI-Assistenten
 
+Diese Datei gilt für jeden KI-Assistenten, der in diesem Repository arbeitet,
+unabhängig vom Werkzeug. Sie ist die einzige Datei dieser Art; werkzeugeigene
+Varianten werden bewusst nicht zusätzlich gepflegt.
+
 Die verbindlichen Regeln für dieses Projekt stehen in [CONTRIBUTING.md](CONTRIBUTING.md).
 Lies sie, bevor du Code, Daten oder Git-Geschichte änderst. Sie gelten
 unverändert auch für dich.
