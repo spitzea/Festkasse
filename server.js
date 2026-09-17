@@ -421,6 +421,11 @@ function closeFinishedBusinessDays(state, now = new Date()) {
       continue;
     }
 
+    // Der Bestand von jetzt gehoert nur zu dem Betriebstag, der gerade eben
+    // geendet hat. Wird ein aelterer Tag nachtraeglich abgeschlossen, ist der
+    // Bestand von damals nicht mehr bekannt - dann bleibt die Spalte leer,
+    // statt eine Zahl von heute als Tagesende auszugeben.
+    const endedLast = businessDayKey(businessDayEnd(key)) === currentKey;
     dayReports.unshift({
       id: `day_${Date.now()}_${crypto.randomBytes(3).toString("hex")}`,
       businessDay: key,
@@ -431,7 +436,7 @@ function closeFinishedBusinessDays(state, now = new Date()) {
       total: dayOrders.reduce((sum, order) => sum + (Number(order.total) || 0), 0),
       orderCount: dayOrders.length,
       orders: dayOrders,
-      stockByArticleId
+      ...(endedLast ? { stockByArticleId } : {})
     });
     closed.push({ key, count: dayOrders.length, merged: false });
   }
